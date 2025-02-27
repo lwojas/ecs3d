@@ -42,4 +42,5 @@ export class System {
   receiveControl() {}
   receiveInteraction() {}
   receiveUpdate() {}
+  refreshList() {}
 }

@@ -3,6 +3,7 @@ export class InventoryComponent {
     this.ammo = {};
     this.items = new Map();
   }
+  // Move to system
   addItem(entity) {
     this.items.set(entity, entity);
   }

@@ -13,19 +13,25 @@ export class Entity {
   }
 
   addComponent(component, componentData) {
+    let spriteExists = false;
     // Remove an previous version of this component
-    if (
-      this.components[component.constructor.name] &&
-      this.components[component.constructor.name].unmount
-    ) {
-      this.components[component.constructor.name].unmount();
+    if (this.components[component.constructor.name]) {
+      // Special sauce for existing sprites
+      if (component.constructor.name === "SpriteComponent") {
+        spriteExists = true;
+        // Record the last known position of the sprite
+        let position = this.getComponent("Position");
+        position.x = this.getComponent("SpriteComponent").sprite.world.x;
+        position.y = this.getComponent("SpriteComponent").sprite.world.y;
+      }
       delete this.components[component.constructor.name];
     }
     this.components[component.constructor.name] = component;
     this.components[component.constructor.name].entity = this;
-    this.snapshot[component.constructor.name] = componentData;
-    if (this.components[component.constructor.name].onmount) {
-      this.components[component.constructor.name].onmount(this);
+
+    if (spriteExists) {
+      console.log("Init entity");
+      this.entityManager.initManager.initEntity(this);
     }
     this.entityManager.updateEntityLists(this);
   }
@@ -42,28 +48,5 @@ export class Entity {
 
   hasComponent(name) {
     return this.components.hasOwnProperty(name);
-  }
-
-  refreshComponents(excludeComponent = null) {
-    console.log(`Resetting entity components, keeping ${excludeComponent}`);
-
-    // Remove all components except the one making the call
-    for (let componentName in this.components) {
-      if (componentName !== excludeComponent) {
-        this.removeComponent(componentName);
-      }
-    }
-    // Reattach components from the stored snapshot
-    for (let [componentName, componentData] of Object.entries(this.snapshot)) {
-      if (
-        componentName !== excludeComponent &&
-        componentName !== "SpriteComponent"
-      ) {
-        this.addComponent(
-          new componentClasses[componentName](this, componentData)
-        );
-      }
-    }
-    this.entityManager.updateEntityLists(this);
   }
 }

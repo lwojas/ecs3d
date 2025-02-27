@@ -1,12 +1,6 @@
 export class PhysicsDynamicComponent {
   constructor(entity, data) {
-    if (entity.hasComponent("SpriteComponent")) {
-      let sprite = entity.getComponent("SpriteComponent").sprite;
-      // console.log(sprite);
-      game.physics.arcade.enable(sprite);
-      sprite.body.collideWorldBounds = true;
-      sprite.anchor.setTo(0.5, 0.5);
-    }
+    this.entity = entity;
 
     // this.Avatar.body.setSize(bodySizeW, bodySizeH, bodyOffsetX, bodyOffsetY);
     // this.Avatar.body.drag.set(0.2);

@@ -1,5 +1,6 @@
 import { Entity } from "../entities/Entity.js";
 import { componentClasses } from "./ComponentClasses.js";
+import { InitManager } from "../system/init/InitManager.js";
 
 export class PrefabFactory {
   constructor(entityManager, componentDefaults, levelData) {

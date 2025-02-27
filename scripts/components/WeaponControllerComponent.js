@@ -5,6 +5,7 @@ export class WeaponControllerComponent {
     this.entity = entity;
     this.currentWeapon;
   }
+  // Move to system
   switchWeapon(entity) {
     if (this.currentWeapon) {
       this.currentWeapon.getComponent("WeaponComponent").weaponSprite.kill();

@@ -6,20 +6,20 @@ export class MotionSystemShip extends System {
     super();
   }
 
-  RIGHT(component) {
-    const spriteComponent = component.entity.getComponent("SpriteComponent");
+  RIGHT(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
     spriteComponent.sprite.body.angularVelocity = 30;
   }
 
-  LEFT(component) {
-    const spriteComponent = component.entity.getComponent("SpriteComponent");
+  LEFT(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
     spriteComponent.sprite.body.angularVelocity = -30;
   }
 
-  UP(component) {
-    const spriteComponent = component.entity.getComponent("SpriteComponent");
-    const maxSpeed =
-      component.entity.getComponent("MovementComponent").maxSpeed || 75;
+  UP(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    entity.getComponent("ShipExhaustComponent").emitter.on = true;
+    const maxSpeed = entity.getComponent("MovementComponent").maxSpeed || 75;
     game.physics.arcade.accelerationFromRotation(
       spriteComponent.sprite.rotation,
       maxSpeed,
@@ -27,13 +27,14 @@ export class MotionSystemShip extends System {
     );
   }
 
-  DOWN(component) {
-    const spriteComponent = component.entity.getComponent("SpriteComponent");
+  DOWN(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
     spriteComponent.sprite.body.velocity.y = 30;
   }
 
-  IDLE(component) {
-    const spriteComponent = component.entity.getComponent("SpriteComponent");
+  IDLE(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    entity.getComponent("ShipExhaustComponent").emitter.on = false;
     // spriteComponent.sprite.body.velocity.y = 0;
     // spriteComponent.sprite.body.velocity.x = 0;
     spriteComponent.sprite.body.acceleration.set(0);
@@ -56,7 +57,7 @@ export class MotionSystemShip extends System {
         let state = component.state;
 
         if (this[state]) {
-          this[state](component);
+          this[state](entity);
         }
       }
     });

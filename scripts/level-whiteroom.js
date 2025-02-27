@@ -10,6 +10,7 @@ import { MotionSystemShip } from "./system/MotionSystemShip.js";
 import { TrackerSystem } from "./system/TrackerSystem.js";
 import { SpriteComponent } from "./components/SpriteComponent.js";
 import { EventBus } from "./services/EventBus.js";
+import { ExhaustSystem } from "./system/init/ExhaustSystem.js";
 
 export class Whiteroom {
   create() {
@@ -34,10 +35,12 @@ export class Whiteroom {
       defaultLevel
     );
     entities = prefabFactory.loadLevel();
+    // const initManager = new InitManager(entities);
 
     // Create and assign systems
     this.movementSystem = new MotionSystemShip();
     this.inputSystem = new InputSystem(this.movementSystem);
+    // this.exhaustSystem = new ExhaustSystem();
     this.overlapSystem = new OverlapSystem(
       ["OverlapComponent"],
       ["PlayerComponent"]

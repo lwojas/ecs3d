@@ -1,10 +1,10 @@
 export class CheckConditionComponent {
   constructor(entity, conditions = []) {
     this.entity = entity;
-    console.log(conditions);
+    // console.log(conditions);
     this.conditions = conditions.conditions; // List of conditions to check
   }
-
+  // Move to system
   isMet(sourceEntity, targetEntity) {
     // const game = ServiceLocator.get("game");
     // const inputSystem = ServiceLocator.get("inputSystem");

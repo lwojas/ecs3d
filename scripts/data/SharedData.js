@@ -5,11 +5,11 @@ export const componentDefaults = {
     InventoryComponent: {},
     SpriteComponent: { spriteKey: "defaultSprite" },
     PhysicsDynamicComponent: { mass: 1, friction: 0.5 },
-    ShipPhysicsComponent: { drag: 20, maxAngular: 100, maxVelocity: 200 },
+    // ShipPhysicsComponent: { drag: 20, maxAngular: 100, maxVelocity: 200 },
     MotionShipComponent: "",
     PlayerComponent: "",
     MovementComponent: { maxSpeed: 100 },
-    ShipExhaustComponent: "",
+    ShipExhaustComponent: { spriteKey: "pixelWhite" },
     WeaponControllerComponent: {},
   },
   trigger: {
@@ -21,7 +21,7 @@ export const componentDefaults = {
       args: "Test action firing",
     },
     // OverlapComponent: "",
-    PhysicsStaticComponent: "",
+    // PhysicsStaticComponent: "",
   },
   weapon: {
     WeaponComponent: { weaponSprite: "shipTurretDefault" },

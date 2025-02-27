@@ -1,8 +1,10 @@
 import { ServiceLocator } from "./ServiceLocator.js";
+import { InitManager } from "../system/init/InitManager.js";
 
 export class EntityManager {
   constructor() {
     ServiceLocator.register("game", "EntityManager", this);
+    this.initManager = new InitManager();
     this.world = [];
     this.worldHash = new Map();
     this.entities = new Set();
@@ -12,6 +14,8 @@ export class EntityManager {
   }
 
   addEntity(entity) {
+    this.initManager.initEntity(entity);
+    // console.log(entity);
     this.world.push(entity);
     this.worldHash.set(entity, this.world.length - 1);
 
@@ -48,6 +52,7 @@ export class EntityManager {
       system.actors = this.makeSpriteList(newList);
       system.entities = newList;
       entityList = newList;
+      if (system.refreshList) system.refreshList();
     }
   }
 
