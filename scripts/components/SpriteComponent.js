@@ -1,7 +1,14 @@
 export class SpriteComponent {
   constructor(entity, data) {
+    this.sprite;
     this.spriteKey = data.spriteKey;
-    this.existed = false;
+    this.enabled = data.enabled ?? true;
     this.entity = entity;
+  }
+
+  unmount() {
+    if (this.sprite) {
+      this.sprite.destroy();
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { Entity } from "../entities/Entity.js";
 import { componentClasses } from "./ComponentClasses.js";
+import { EntityStore } from "./EntityStore.js";
 import { InitManager } from "../system/init/InitManager.js";
 
 export class PrefabFactory {
@@ -15,18 +16,30 @@ export class PrefabFactory {
     // Fetch default components for this type, fallback to empty object
     const defaultComponents = this.componentDefaults[type] || {};
 
+    // Check for previous component snapshots
+    let inventoryComponents = {};
+    EntityStore.inventories.forEach((entity) => {
+      entity.forEach((inventoryEntity) => {
+        if (uniqueId === inventoryEntity.id) {
+          inventoryComponents = inventoryEntity.components;
+        }
+      });
+    });
+
     // Merge default components with provided components (allowing overrides)
-    const mergedComponents = { ...defaultComponents, ...components };
-    // console.log(components);
+    const mergedComponents = {
+      ...defaultComponents,
+      ...components,
+      ...inventoryComponents,
+    };
+
     // Create new entity
     const entity = new Entity(uniqueId);
-
+    entity.snapshot = mergedComponents;
     // Add merged components to the entity
     for (const [componentName, componentData] of Object.entries(
       mergedComponents
     )) {
-      // console.log(componentName, componentData);
-      //   const ComponentClass = this.getComponentClass(componentName);
       if (componentClasses[componentName]) {
         entity.addComponent(
           new componentClasses[componentName](entity, componentData),

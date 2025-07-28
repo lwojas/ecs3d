@@ -12,10 +12,13 @@ import { ShipPhysicsComponent } from "../components/ShipPhysicsComponent.js";
 import { ShipExhaustComponent } from "../components/ShipExhaustComponent.js";
 import { WeaponComponent } from "../components/tags/WeaponComponent.js";
 import { WeaponControllerComponent } from "../components/WeaponControllerComponent.js";
-import { InventoryComponent } from "../components/tags/InventoryComponent.js";
+import { InventoryComponent } from "../components/InventoryComponent.js";
 import { TrackerComponent } from "../components/tags/TrackerComponent.js";
 import { CheckConditionComponent } from "../components/CheckConditionComponent.js";
 import { CameraFollowComponent } from "../components/CameraFollowComponent.js";
+import { ProjectileComponent } from "../components/tags/ProjectileComponent.js";
+import { AmmoComponent } from "../components/tags/AmmoComponent.js";
+import { AmmoItemComponent } from "../components/tags/AmmoItemComponent.js";
 
 export const componentClasses = {
   InputComponent: InputComponent,
@@ -37,4 +40,7 @@ export const componentClasses = {
   TrackerComponent: TrackerComponent,
   CheckConditionComponent: CheckConditionComponent,
   CameraFollowComponent: CameraFollowComponent,
+  ProjectileComponent: ProjectileComponent,
+  AmmoComponent: AmmoComponent,
+  AmmoItemComponent: AmmoItemComponent,
 };

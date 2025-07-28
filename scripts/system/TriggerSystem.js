@@ -1,5 +1,7 @@
 import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
+import { checkCondition } from "./utils/checkCondition.js";
+import { killSprite } from "./utils/spriteTools.js";
 
 export class TriggerSystem extends System {
   constructor(entityComponents, targetComponents) {
@@ -14,40 +16,41 @@ export class TriggerSystem extends System {
   }
 
   receiveInteraction(entities, keyCode) {
-    console.log(keyCode);
-
+    // console.log(keyCode);
     this.entities.forEach((entity) => {
-      entity.getComponent("InputComponent").keyPressed = true;
+      if (!entity.hasComponent("InputComponent")) return;
+      let inputComp = entity.getComponent("InputComponent");
+      inputComp.keyPressed = true;
+      inputComp.keyCode = keyCode;
     });
   }
 
   triggerEvent(triggerSprite, targetSprite) {
     let triggerEntity = triggerSprite.parentEntity;
     let triggerComponent = triggerEntity.getComponent("TriggerComponent");
+    if (!triggerComponent.enabled) return;
     let conditionComponent = triggerEntity.getComponent(
       "CheckConditionComponent"
     );
-    // console.log(triggerEntity);
+
     if (
       conditionComponent &&
-      !conditionComponent.isMet(triggerEntity, targetSprite.parentEntity)
+      !checkCondition(triggerEntity, targetSprite.parentEntity)
     ) {
       return; // Conditions not met, do nothing
     }
-    console.log(
-      conditionComponent.isMet(triggerEntity, targetSprite.parentEntity),
-      console.log(conditionComponent.conditions)
-    );
+
     // Fire the trigger action
     console.log(`Triggering action: ${triggerComponent.action}`);
     ServiceLocator.resolve("game", "EventSystem").emit(
       triggerComponent.action,
-      triggerComponent.args
+      triggerSprite.parentEntity,
+      targetSprite.parentEntity
     );
 
     // If the trigger should only run once, remove it
     if (triggerComponent.runOnce) {
-      this.entityManager.removeEntity(triggerEntity);
+      killSprite(triggerEntity);
     }
   }
 
@@ -59,11 +62,5 @@ export class TriggerSystem extends System {
       null,
       this
     );
-    this.entities.forEach((entity) => {
-      let input = entity.getComponent("InputComponent");
-      if (input) {
-        input.keyPressed = false;
-      }
-    });
   }
 }

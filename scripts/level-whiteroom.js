@@ -10,12 +10,16 @@ import { MotionSystemShip } from "./system/MotionSystemShip.js";
 import { TrackerSystem } from "./system/TrackerSystem.js";
 import { SpriteComponent } from "./components/SpriteComponent.js";
 import { EventBus } from "./services/EventBus.js";
-import { ExhaustSystem } from "./system/init/ExhaustSystem.js";
+import { WeaponSystem } from "./system/WeaponSystem.js";
+import { CameraSystem } from "./system/CameraSystem.js";
+import { InventorySystem } from "./system/InventorySystem.js";
+import { ProjectileSystem } from "./system/ProjectileSystem.js";
+import { AmmoSystem } from "./system/AmmoSystem.js";
 
 export class Whiteroom {
   create() {
-    let entities = [];
-    BasicGame.entities = entities;
+    this.entities = [];
+    BasicGame.entities = this.entities;
     this.movementSystem;
     this.inputSystem;
     this.overlapSystem;
@@ -23,51 +27,64 @@ export class Whiteroom {
     this.trackerSystem;
     console.log("White level loaded");
     BasicGame.service = ServiceLocator;
-    this.eventSystem = new EventBus();
+
+    // Automatically registers to ServiceLocator - needs domain ("system", "game")
+    this.eventSystemGame = new EventBus("game");
 
     // All systems can reach the entity manager via Service locator
-    let entityManager = new EntityManager();
+    this.entityManager = new EntityManager();
 
     // Generate entities from Json
     const prefabFactory = new PrefabFactory(
-      entityManager,
+      this.entityManager,
       componentDefaults,
       defaultLevel
     );
-    entities = prefabFactory.loadLevel();
-    // const initManager = new InitManager(entities);
+    this.entities = prefabFactory.loadLevel();
 
     // Create and assign systems
+
+    // this.overlapSystem = new OverlapSystem(
+    //   ["OverlapComponent"],
+    //   ["PlayerComponent"]
+    // );
+
+    // Tidy up
     this.movementSystem = new MotionSystemShip();
     this.inputSystem = new InputSystem(this.movementSystem);
-    // this.exhaustSystem = new ExhaustSystem();
-    this.overlapSystem = new OverlapSystem(
-      ["OverlapComponent"],
-      ["PlayerComponent"]
-    );
     this.triggerSystem = new TriggerSystem(
       ["TriggerComponent"],
       ["PlayerComponent"]
     );
     this.inputSystem.addSystemListener(this.triggerSystem);
+
+    this.inventorySystem = new InventorySystem();
+    this.cameraSystem = new CameraSystem(this.entities);
+    this.weaponSystem = new WeaponSystem();
+    this.inputSystem.addSystemListener(this.weaponSystem);
+
+    this.projectileSystem = new ProjectileSystem(this.entities);
+    this.weaponSystem.addSystemListener(this.projectileSystem);
+    this.ammoSystem = new AmmoSystem(this.entities);
+
     this.trackerSystem = new TrackerSystem();
 
-    BasicGame.test = entities;
+    // Testing only
+    BasicGame.entities = this.entities;
     BasicGame.SpriteComponent = SpriteComponent;
-    // entities[0]
-    //   .getComponent("WeaponControllerComponent")
-    //   .switchWeapon(entities[3]);
-    // entities[0]
-    //   .getComponent("WeaponControllerComponent")
-    //   .switchWeapon(entities[3]);
-    entities[0].addComponent(
-      new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
-    );
+    // this.inventorySystem.addItem(this.entities[3], this.entities[0]);
+    // this.weaponSystem.equipWeapon(this.entities[3], this.entities[0]);
+
+    // entities[0].addComponent(
+    //   new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
+    // );
   }
 
   update() {
+    this.inputSystem.update();
     this.triggerSystem.update();
     this.trackerSystem.update();
+    this.weaponSystem.update();
   }
 
   preRender() {}
@@ -78,9 +95,7 @@ export class Whiteroom {
   }
 
   shutdown() {
-    // BasicGame.AudioSystem.ResetAudio();
-    // BasicGame.SuperSpriteGroup.destroy(true);
-    // BasicGame.ResetGameSystems(BasicGame.objectGarbageArray);
-    // BasicGame.GlobalSignals.reset_PM_SIGNALS.dispatch();
+    this.inventorySystem.shutdown(this.entities);
+    ServiceLocator.shutDown();
   }
 }

@@ -31,6 +31,34 @@ export const defaultLevel = {
         },
       },
     },
-    { type: "weapon", uniqueId: "test_turret" },
+
+    {
+      type: "trigger",
+      uniqueId: "test_turret",
+      components: {
+        Position: { x: 300, y: 100 },
+        SpriteComponent: { spriteKey: "shipTurretDefault" },
+        WeaponComponent: {
+          spriteKey: "shipTurretDefault",
+          weaponType: "canon",
+          weaponClass: "gun",
+        },
+      },
+    },
+    {
+      type: "trigger",
+      uniqueId: "ammo_trigger",
+      components: {
+        Position: { x: 600, y: 100 },
+        TriggerComponent: {
+          runOnce: true,
+          action: "G_ADD_AMMO",
+        },
+        AmmoItemComponent: { weaponType: "canon", amount: 200 },
+      },
+    },
+    {
+      type: "projectile",
+    },
   ],
 };

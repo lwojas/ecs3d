@@ -26,6 +26,7 @@ export class Entity {
       }
       delete this.components[component.constructor.name];
     }
+    this.snapshot[component.constructor.name] = componentData;
     this.components[component.constructor.name] = component;
     this.components[component.constructor.name].entity = this;
 
@@ -43,6 +44,7 @@ export class Entity {
   removeComponent(name) {
     if (this.components[name].unmount) this.components[name].unmount();
     delete this.components[name];
+    delete this.snapshot[name];
     this.entityManager.updateEntityLists(this);
   }
 

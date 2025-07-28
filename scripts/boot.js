@@ -24,6 +24,7 @@ BasicGame.Boot.prototype = {
   },
 
   create: function () {
+    // game.stage.backgroundColor = "#FFFFFF";
     this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL; // Scale the canvas to fit the whole window
     this.world.setBounds(0, 0, 2400, 1440); // Set the size of the game world - this is not the size of the camera
     this.time.advancedTiming = true;

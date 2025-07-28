@@ -15,6 +15,7 @@ export class InputSystem extends System {
       left: Phaser.KeyCode.LEFT,
       right: Phaser.KeyCode.RIGHT,
       space: Phaser.KeyCode.SPACEBAR,
+      f: Phaser.KeyCode.F,
     });
 
     // On key down
@@ -50,6 +51,11 @@ export class InputSystem extends System {
       this.sendInteraction("space");
       // });
     });
+    this.keybMap.f.onDown.add(() => {
+      // this.entities.forEach((entity) => {
+      this.sendInteraction("f");
+      // });
+    });
     // this.keybMap.space.onUp.add(() => {
     //   this.entities.forEach((entity) => {
     //     const keyPresses = entity.getComponent("InputComponent").keyPresses;
@@ -64,5 +70,15 @@ export class InputSystem extends System {
     // BasicGame.downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
     // BasicGame.leftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
     // BasicGame.rightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+  }
+
+  update() {
+    this.entities.forEach((entity) => {
+      let input = entity.getComponent("InputComponent");
+      if (input) {
+        input.keyPressed = false;
+        input.keyCode = "";
+      }
+    });
   }
 }

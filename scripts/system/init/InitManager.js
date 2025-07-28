@@ -14,10 +14,13 @@ export class InitManager {
   }
 
   initEntity(entity) {
+    if (!entity.hasComponent("SpriteComponent")) return;
     this.spriteManager.createSprite(entity);
     this.physicsManager.addDynamicBody(entity);
     this.physicsManager.addStaticBody(entity);
     this.exhaustSystem.createExhaust(entity);
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    if (!spriteComponent.enabled) spriteComponent.sprite.kill();
     // console.log(entity);
   }
 }
