@@ -11,6 +11,11 @@ export class PhysicsManager {
       game.physics.arcade.enable(sprite);
       sprite.body.collideWorldBounds = true;
       sprite.anchor.setTo(0.5, 0.5);
+      // If there is a movement component lets adjust a few more properties on the body
+      if (!entity.hasComponent("MovementComponent")) return;
+      const movement = entity.getComponent("MovementComponent");
+      sprite.body.drag.set(movement.drag);
+      sprite.body.maxVelocity.set(movement.maxVelocity);
     }
   }
 

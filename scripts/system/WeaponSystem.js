@@ -1,6 +1,7 @@
 import { System } from "./System.js";
 import { TrackerComponent } from "../components/tags/TrackerComponent.js";
 import { ServiceLocator } from "../services/ServiceLocator.js";
+import { spriteLayers } from "./utils/spriteLayers.js";
 
 export class WeaponSystem extends System {
   constructor() {
@@ -20,6 +21,23 @@ export class WeaponSystem extends System {
       "G_EQUIP_WEAPON",
       this.equipWeapon
     );
+
+    ServiceLocator.resolve("game", "EventSystem").on(
+      "G_SPRITE_UPDATED",
+      this.refreshWeapon.bind(this)
+    );
+  }
+
+  refreshWeapon(entity) {
+    // If we change the player sprite
+    if (!entity.hasComponent("WeaponControllerComponent")) return;
+    const currentWeapon = entity.getComponent(
+      "WeaponControllerComponent"
+    ).currentWeapon;
+    if (currentWeapon) {
+      console.log(this);
+      this.equipWeapon(currentWeapon, entity);
+    }
   }
 
   createWeapon(entity) {
@@ -29,6 +47,7 @@ export class WeaponSystem extends System {
       100,
       weaponComponent.spriteKey
     );
+    spriteLayers.fg4.add(weaponComponent.weaponSprite);
     // console.log("Weapon sprite created");
     weaponComponent.weaponSprite.anchor.setTo(0.5, 0.5);
     weaponComponent.weaponSprite.scale.setTo(2, 2);
@@ -49,6 +68,7 @@ export class WeaponSystem extends System {
       }
       weaponController.currentWeapon = weaponEntity;
       //   console.log(entity, this.entity);
+
       weaponEntity.getComponent("WeaponComponent").weaponSprite.reset(0, 0);
       weaponEntity.addComponent(
         new TrackerComponent(

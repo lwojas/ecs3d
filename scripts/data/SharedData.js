@@ -13,9 +13,55 @@ export const componentDefaults = {
     MotionShipComponent: "",
     PlayerComponent: "",
     CameraFollowComponent: {},
-    MovementComponent: { maxSpeed: 100 },
+    MovementComponent: { maxSpeed: 200 },
     ShipExhaustComponent: { spriteKey: "pixelWhite" },
     WeaponControllerComponent: {},
+    HealthComponent: { health: 300 },
+    FactionComponent: {
+      faction: {
+        pirate: 0,
+        player: -100,
+        police: 0,
+        trader: 0,
+        civilian: 0,
+      },
+    },
+  },
+
+  pirate: {
+    SpriteComponent: { spriteKey: "Cobra" },
+    PerceptionComponent: {},
+    FactionComponent: {
+      allegiance: "pirate",
+      faction: {
+        pirate: -99,
+        player: 30,
+        police: 30,
+        trader: 70,
+        civilian: 50,
+      },
+    },
+    EmotionComponent: { aggression: 50 },
+    HealthComponent: { health: 100 },
+    IntelligenceComponent: { intelligence: 1, obedience: 0.5 },
+  },
+
+  trader: {
+    SpriteComponent: { spriteKey: "Cobra" },
+    PerceptionComponent: {},
+    FactionComponent: {
+      // allegiance: "pirate",
+      faction: {
+        pirate: 30,
+        player: -10,
+        police: -30,
+        trader: -99,
+        civilian: -10,
+      },
+    },
+    EmotionComponent: { aggression: -50 },
+    HealthComponent: { health: 50 },
+    IntelligenceComponent: { intelligence: 1, obedience: 0 },
   },
 
   trigger: {
@@ -24,7 +70,7 @@ export const componentDefaults = {
     TriggerComponent: {
       runOnce: false,
       action: "G_INVENTORY_ADD_ITEM",
-      // args: "Test action firing",
+      args: "Test action firing",
     },
     PhysicsStaticComponent: "",
   },

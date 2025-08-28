@@ -8,6 +8,8 @@ export function checkCondition(sourceEntity, targetEntity) {
     "CheckConditionComponent"
   ).conditions;
 
+  // console.log(conditions);
+
   // for (let condition of conditions) {s
   for (let i = 0; i < conditions.length; i++) {
     //  console.log(sourceEntity);
@@ -15,11 +17,13 @@ export function checkCondition(sourceEntity, targetEntity) {
     switch (conditions[i].type) {
       case "keyPress":
         inputComponent = sourceEntity.getComponent("InputComponent");
-        console.log(inputComponent.keyCode, conditions[i].key);
-        if (!inputComponent.keyPressed) {
+        // console.log(inputComponent.keyCode, conditions[i].key);
+        if (!inputComponent?.keyPressed) {
+          console.log("Key not pressed", conditions[i].key);
           return false; // Key not pressed
         }
         if (inputComponent.keyCode !== conditions[i].key) {
+          console.log("Wrong keycode");
           return false;
         }
         break;
@@ -35,5 +39,6 @@ export function checkCondition(sourceEntity, targetEntity) {
         break;
     }
   }
+  console.log("All conditions met");
   return true; // All conditions met
 }

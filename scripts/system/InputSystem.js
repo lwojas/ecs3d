@@ -76,8 +76,8 @@ export class InputSystem extends System {
     this.entities.forEach((entity) => {
       let input = entity.getComponent("InputComponent");
       if (input) {
-        input.keyPressed = false;
-        input.keyCode = "";
+        // input.keyPressed = false;
+        // input.keyCode = "";
       }
     });
   }

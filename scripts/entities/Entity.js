@@ -14,7 +14,7 @@ export class Entity {
 
   addComponent(component, componentData) {
     let spriteExists = false;
-    // Remove an previous version of this component
+    // Remove a previous version of this component
     if (this.components[component.constructor.name]) {
       // Special sauce for existing sprites
       if (component.constructor.name === "SpriteComponent") {

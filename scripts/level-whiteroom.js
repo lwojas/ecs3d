@@ -15,10 +15,16 @@ import { CameraSystem } from "./system/CameraSystem.js";
 import { InventorySystem } from "./system/InventorySystem.js";
 import { ProjectileSystem } from "./system/ProjectileSystem.js";
 import { AmmoSystem } from "./system/AmmoSystem.js";
+import { registerEvents } from "./services/Events.js";
+import { initialiseSpriteLayers } from "./system/utils/spriteLayers.js";
+import { LightSystem } from "./system/LightSystem.js";
+import { PerceptionSystem } from "./system/PerceptionSystem.js";
+import { AIScoringSystem } from "./system/AIScoringSystem.js";
 
 export class Whiteroom {
   create() {
     this.entities = [];
+    initialiseSpriteLayers();
     BasicGame.entities = this.entities;
     this.movementSystem;
     this.inputSystem;
@@ -68,6 +74,9 @@ export class Whiteroom {
     this.ammoSystem = new AmmoSystem(this.entities);
 
     this.trackerSystem = new TrackerSystem();
+    this.perceptionSystem = new PerceptionSystem();
+    this.AIscoringSystem = new AIScoringSystem();
+    // this.perceptionSystem.addSystemListener(this.AIscoringSystem);
 
     // Testing only
     BasicGame.entities = this.entities;
@@ -78,13 +87,18 @@ export class Whiteroom {
     // entities[0].addComponent(
     //   new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
     // );
+    this.lightSystem = new LightSystem();
+    registerEvents();
   }
 
   update() {
     this.inputSystem.update();
+    this.movementSystem.update();
     this.triggerSystem.update();
     this.trackerSystem.update();
     this.weaponSystem.update();
+    this.perceptionSystem.update();
+    this.lightSystem.update();
   }
 
   preRender() {}

@@ -21,12 +21,14 @@ BasicGame.Boot.prototype = {
     this.load.spritesheet("defaultPawn", "assets/_default_pawn.png", 16, 16);
     this.load.image("pixelWhite", "assets/_pixel_white.png");
     this.load.image("shipTurretDefault", "assets/_ship_turret_default.png");
+    this.load.image("defaultLight", "assets/_light_default.png");
+    this.load.image("starfield", "assets/_bg_nebula.png");
   },
 
   create: function () {
-    // game.stage.backgroundColor = "#FFFFFF";
+    game.stage.backgroundColor = "#555";
     this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL; // Scale the canvas to fit the whole window
-    this.world.setBounds(0, 0, 2400, 1440); // Set the size of the game world - this is not the size of the camera
+    this.world.setBounds(0, 0, 5000, 5000); // Set the size of the game world - this is not the size of the camera
     this.time.advancedTiming = true;
     this.physics.startSystem(Phaser.Physics.ARCADE);
     game.camera.roundPx = false; // stops the sprite from jittering.

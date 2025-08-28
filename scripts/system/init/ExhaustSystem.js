@@ -43,7 +43,7 @@ export class ExhaustSystem {
   }
 
   refreshComponent(entity) {
-    // console.log(entity);
+    console.log(entity);
     let sprite = entity.getComponent("SpriteComponent").sprite;
     let offSet = sprite.addChild(game.make.sprite(-12, 0, sprite.key));
     offSet.anchor.setTo(0.5, 0.5);

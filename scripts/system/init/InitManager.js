@@ -1,6 +1,8 @@
 import { ExhaustSystem } from "./ExhaustSystem.js";
 import { PhysicsManager } from "./PhysicsManager.js";
 import { SpriteManager } from "./SpriteManager.js";
+import { followEntity } from "../utils/cameraFollow.js";
+import { ServiceLocator } from "../../services/ServiceLocator.js";
 
 export class InitManager {
   constructor() {
@@ -19,8 +21,15 @@ export class InitManager {
     this.physicsManager.addDynamicBody(entity);
     this.physicsManager.addStaticBody(entity);
     this.exhaustSystem.createExhaust(entity);
+    followEntity(entity);
+    ServiceLocator.resolve("game", "EventSystem").emit(
+      "G_SPRITE_UPDATED",
+      entity
+    );
     const spriteComponent = entity.getComponent("SpriteComponent");
     if (!spriteComponent.enabled) spriteComponent.sprite.kill();
     // console.log(entity);
+    if (!entity.hasComponent("LightComponent")) return;
+    entity.getComponent("LightComponent").position = spriteComponent.sprite;
   }
 }

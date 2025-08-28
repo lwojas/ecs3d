@@ -4,22 +4,26 @@ import { System } from "./System.js";
 export class MotionSystemShip extends System {
   constructor() {
     super();
+
+    this.entities = this.entityManager.registerSystem(this, [
+      "MotionShipComponent",
+    ]);
   }
 
   RIGHT(entity) {
     const spriteComponent = entity.getComponent("SpriteComponent");
-    spriteComponent.sprite.body.angularVelocity = 30;
+    spriteComponent.sprite.body.angularVelocity = 150;
   }
 
   LEFT(entity) {
     const spriteComponent = entity.getComponent("SpriteComponent");
-    spriteComponent.sprite.body.angularVelocity = -30;
+    spriteComponent.sprite.body.angularVelocity = -150;
   }
 
-  UP(entity) {
+  RIGHTTHRUST(entity) {
     const spriteComponent = entity.getComponent("SpriteComponent");
-    entity.getComponent("ShipExhaustComponent").emitter.on = true;
-    const maxSpeed = entity.getComponent("MovementComponent").maxSpeed || 75;
+    spriteComponent.sprite.body.angularVelocity = 150;
+    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
     game.physics.arcade.accelerationFromRotation(
       spriteComponent.sprite.rotation,
       maxSpeed,
@@ -27,18 +31,41 @@ export class MotionSystemShip extends System {
     );
   }
 
+  LEFTTHRUST(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    spriteComponent.sprite.body.angularVelocity = -150;
+    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+    game.physics.arcade.accelerationFromRotation(
+      spriteComponent.sprite.rotation,
+      maxSpeed,
+      spriteComponent.sprite.body.acceleration
+    );
+  }
+
+  UP(entity) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+    game.physics.arcade.accelerationFromRotation(
+      spriteComponent.sprite.rotation,
+      maxSpeed,
+      spriteComponent.sprite.body.acceleration
+    );
+    spriteComponent.sprite.body.angularVelocity = 0;
+    if (!entity.hasComponent("ShipExhaustComponent")) return;
+    entity.getComponent("ShipExhaustComponent").emitter.on = true;
+  }
+
   DOWN(entity) {
     const spriteComponent = entity.getComponent("SpriteComponent");
-    spriteComponent.sprite.body.velocity.y = 30;
+    // spriteComponent.sprite.body.velocity.y = 30;
   }
 
   IDLE(entity) {
     const spriteComponent = entity.getComponent("SpriteComponent");
-    entity.getComponent("ShipExhaustComponent").emitter.on = false;
-    // spriteComponent.sprite.body.velocity.y = 0;
-    // spriteComponent.sprite.body.velocity.x = 0;
     spriteComponent.sprite.body.acceleration.set(0);
     spriteComponent.sprite.body.angularVelocity = 0;
+    if (!entity.hasComponent("ShipExhaustComponent")) return;
+    entity.getComponent("ShipExhaustComponent").emitter.on = false;
   }
 
   receiveUpdate(entities, command) {
@@ -54,11 +81,22 @@ export class MotionSystemShip extends System {
           console.log("No state found for this action", command);
         }
 
-        let state = component.state;
+        // let state = component.state;
 
-        if (this[state]) {
-          this[state](entity);
-        }
+        // if (this[state]) {
+        //   this[state](entity);
+        // }
+      }
+    });
+  }
+
+  update() {
+    this.entities.forEach((entity) => {
+      let component = entity.getComponent("MotionShipComponent");
+      let state = component.state;
+
+      if (this[state]) {
+        this[state](entity);
       }
     });
   }

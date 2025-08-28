@@ -1,3 +1,5 @@
+import { spriteLayers } from "../utils/spriteLayers.js";
+
 export class SpriteManager {
   constructor() {
     this.entities = new Map();
@@ -18,6 +20,10 @@ export class SpriteManager {
       position.y,
       spriteComponent.spriteKey
     );
+
+    sprite.scale.setTo(spriteComponent.scale);
+
+    spriteLayers[spriteComponent.layer].add(sprite);
 
     sprite.parentEntity = entity;
     spriteComponent.sprite = sprite;

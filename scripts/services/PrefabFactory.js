@@ -43,6 +43,7 @@ export class PrefabFactory {
       if (componentClasses[componentName]) {
         entity.addComponent(
           new componentClasses[componentName](entity, componentData),
+          // For snapshot:
           componentData
         );
       }

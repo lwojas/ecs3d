@@ -16,7 +16,7 @@ export class TriggerSystem extends System {
   }
 
   receiveInteraction(entities, keyCode) {
-    // console.log(keyCode);
+    console.log("Receiving interation", keyCode);
     this.entities.forEach((entity) => {
       if (!entity.hasComponent("InputComponent")) return;
       let inputComp = entity.getComponent("InputComponent");
@@ -29,12 +29,12 @@ export class TriggerSystem extends System {
     let triggerEntity = triggerSprite.parentEntity;
     let triggerComponent = triggerEntity.getComponent("TriggerComponent");
     if (!triggerComponent.enabled) return;
-    let conditionComponent = triggerEntity.getComponent(
-      "CheckConditionComponent"
-    );
+    // let conditionComponent = triggerEntity.getComponent(
+    //   "CheckConditionComponent"
+    // );
 
     if (
-      conditionComponent &&
+      triggerEntity.hasComponent("CheckConditionComponent") &&
       !checkCondition(triggerEntity, targetSprite.parentEntity)
     ) {
       return; // Conditions not met, do nothing
@@ -52,6 +52,9 @@ export class TriggerSystem extends System {
     if (triggerComponent.runOnce) {
       killSprite(triggerEntity);
     }
+
+    if (!triggerEntity.hasComponent("InputComponent")) return;
+    triggerEntity.getComponent("InputComponent").keyPressed = false;
   }
 
   update() {

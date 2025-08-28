@@ -19,6 +19,15 @@ import { CameraFollowComponent } from "../components/CameraFollowComponent.js";
 import { ProjectileComponent } from "../components/tags/ProjectileComponent.js";
 import { AmmoComponent } from "../components/tags/AmmoComponent.js";
 import { AmmoItemComponent } from "../components/tags/AmmoItemComponent.js";
+import { LightComponent } from "../components/LightComponent.js";
+import { AIStateComponent } from "../components/AIStateComponent.js";
+import { EmotionComponent } from "../components/EmotionComponent.js";
+import { FactionComponent } from "../components/FactionComponent.js";
+import { NotorietyComponent } from "../components/NotorietyComponent.js";
+import { PerceptionComponent } from "../components/PerceptionComponent.js";
+import { HealthComponent } from "../components/HealthComponent.js";
+import { IntelligenceComponent } from "../components/IntelligenceComponent.js";
+import { ShadowComponent } from "../components/tags/ShadowComponent.js";
 
 export const componentClasses = {
   InputComponent: InputComponent,
@@ -43,4 +52,13 @@ export const componentClasses = {
   ProjectileComponent: ProjectileComponent,
   AmmoComponent: AmmoComponent,
   AmmoItemComponent: AmmoItemComponent,
+  LightComponent: LightComponent,
+  AIStateComponent: AIStateComponent,
+  EmotionComponent: EmotionComponent,
+  FactionComponent: FactionComponent,
+  NotorietyComponent: NotorietyComponent,
+  PerceptionComponent: PerceptionComponent,
+  HealthComponent: HealthComponent,
+  IntelligenceComponent: IntelligenceComponent,
+  ShadowComponent: ShadowComponent,
 };
