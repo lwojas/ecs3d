@@ -23,10 +23,13 @@ BasicGame.Boot.prototype = {
     this.load.image("shipTurretDefault", "assets/_ship_turret_default.png");
     this.load.image("defaultLight", "assets/_light_default.png");
     this.load.image("starfield", "assets/_bg_nebula.png");
+    this.load.image("lightShip", "assets/_light_ship2.png");
+    // this.load.image("dyson", "assets/_dyson.png");
+    // this.load.image("dysonLight", "assets/_light_ship2.png");
   },
 
   create: function () {
-    game.stage.backgroundColor = "#555";
+    game.stage.backgroundColor = "#999";
     this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL; // Scale the canvas to fit the whole window
     this.world.setBounds(0, 0, 5000, 5000); // Set the size of the game world - this is not the size of the camera
     this.time.advancedTiming = true;

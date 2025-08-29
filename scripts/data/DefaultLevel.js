@@ -7,6 +7,13 @@ export const defaultLevel = {
     //     SpriteComponent: { spriteKey: "starfield", layer: "bg0", scale: 4 },
     //   },
     // },
+    // {
+    //   type: "background",
+    //   components: {
+    //     Position: { x: 0, y: 0 },
+    //     SpriteComponent: { spriteKey: "dyson", layer: "bg1", scale: 1 },
+    //   },
+    // },
     {
       type: "background",
       components: {
@@ -19,19 +26,26 @@ export const defaultLevel = {
         ShadowComponent: { sprite: "defaultObject", scale: 4 },
       },
     },
-    // {
-    //   type: "background",
-    //   components: {
-    //     Position: { x: 300, y: 500 },
-    //     SpriteComponent: {
-    //       spriteKey: "defaultObject",
-    //       layer: "shadows",
-    //       scale: 4,
-    //     },
-    //     // ShadowComponent: { sprite: "defaultObject", scale: 4 },
-    //     LightComponent: ["defaultLight"],
-    //   },
-    // },
+    {
+      type: "background",
+      components: {
+        Position: { x: 300, y: 500 },
+        SpriteComponent: {
+          spriteKey: "defaultObject",
+          layer: "fg3",
+          scale: 4,
+        },
+        // ShadowComponent: { sprite: "defaultObject", scale: 4 },
+        LightComponent: {
+          sprites: [
+            { scale: 4, sprite: "defaultLight" },
+            // { scale: 1, sprite: "lightShip" },
+          ],
+          castShadows: true,
+        },
+      },
+    },
+
     {
       type: "player_ship",
       uniqueId: "player_1",
@@ -40,9 +54,17 @@ export const defaultLevel = {
         SpriteComponent: { spriteKey: "Cobra", layer: "fg3" },
         CameraFollowComponent: {},
         PerceptionComponent: "",
-        LightComponent: ["defaultLight"],
+        LightComponent: {
+          sprites: [
+            // { scale: 4, sprite: "defaultLight" },
+            { scale: 1, sprite: "lightShip" },
+          ],
+          castShadows: true,
+          isSpot: true,
+        },
       },
     },
+
     {
       type: "pirate",
       uniqueId: "pirate_test",
