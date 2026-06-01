@@ -12,8 +12,14 @@ export class TrackerSystem extends System {
   update() {
     this.entities.forEach((entity) => {
       const trackerComponent = entity.getComponent("TrackerComponent");
-      trackerComponent.source.x = trackerComponent.target.world.x;
-      trackerComponent.source.y = trackerComponent.target.world.y;
+      trackerComponent.source.x =
+        trackerComponent.target.body?.x + trackerComponent.target.width / 2 ||
+        trackerComponent.target.world.x;
+      trackerComponent.source.y =
+        trackerComponent.target.body?.y + trackerComponent.target.height / 2 ||
+        trackerComponent.target.world.y;
+      // trackerComponent.source.x = trackerComponent.target.world.x;
+      // trackerComponent.source.y = trackerComponent.target.world.y;
     });
   }
 }

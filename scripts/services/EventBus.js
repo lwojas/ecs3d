@@ -1,9 +1,9 @@
 import { ServiceLocator } from "./ServiceLocator.js";
 
 export class EventBus {
-  constructor() {
+  constructor(domain) {
     this.events = {};
-    ServiceLocator.register("game", "EventSystem", this);
+    ServiceLocator.register(domain, "EventSystem", this);
   }
 
   on(eventName, callback) {
@@ -13,9 +13,9 @@ export class EventBus {
     this.events[eventName].push(callback);
   }
 
-  emit(eventName, args) {
+  emit(eventName, ...args) {
     if (this.events[eventName]) {
-      this.events[eventName].forEach((callback) => callback(args));
+      this.events[eventName].forEach((callback) => callback(...args));
     } else {
       console.warn(`No event listener registered for ${eventName}`);
     }

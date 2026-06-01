@@ -4,6 +4,8 @@ export class System {
   constructor() {
     this.systemListeners = new Map();
     this.listenerList = [];
+    this.componentLists = {};
+    this.actors = [];
     // this.entities;
     this.entityManager = ServiceLocator.resolve("game", "EntityManager");
   }
@@ -42,4 +44,5 @@ export class System {
   receiveControl() {}
   receiveInteraction() {}
   receiveUpdate() {}
+  refreshList() {}
 }

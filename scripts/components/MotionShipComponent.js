@@ -16,6 +16,20 @@ export class MotionShipComponent {
           this.state = "DOWN";
         },
       },
+      RIGHTTHRUST: {
+        rightOff: () => {
+          this.state = "UP";
+        },
+        left: () => {
+          this.state = "LEFTTHRUST";
+        },
+        up: () => {
+          this.state = "UP";
+        },
+        down: () => {
+          this.state = "DOWN";
+        },
+      },
       RIGHT: {
         rightOff: () => {
           this.state = "IDLE";
@@ -23,6 +37,21 @@ export class MotionShipComponent {
         left: () => {
           this.state = "LEFT";
         },
+        up: () => {
+          this.state = "UP";
+        },
+        down: () => {
+          this.state = "DOWN";
+        },
+      },
+      LEFTTHRUST: {
+        leftOff: () => {
+          this.state = "UP";
+        },
+        right: () => {
+          this.state = "RIGHTTHRUST";
+        },
+
         up: () => {
           this.state = "UP";
         },
@@ -64,10 +93,10 @@ export class MotionShipComponent {
           this.state = "IDLE";
         },
         right: () => {
-          this.state = "RIGHT";
+          this.state = "RIGHTTHRUST";
         },
         left: () => {
-          this.state = "LEFT";
+          this.state = "LEFTTHRUST";
         },
 
         down: () => {

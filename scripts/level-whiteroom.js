@@ -10,11 +10,28 @@ import { MotionSystemShip } from "./system/MotionSystemShip.js";
 import { TrackerSystem } from "./system/TrackerSystem.js";
 import { SpriteComponent } from "./components/SpriteComponent.js";
 import { EventBus } from "./services/EventBus.js";
+import { WeaponSystem } from "./system/WeaponSystem.js";
+import { CameraSystem } from "./system/CameraSystem.js";
+import { InventorySystem } from "./system/InventorySystem.js";
+import { ProjectileSystem } from "./system/ProjectileSystem.js";
+import { AmmoSystem } from "./system/AmmoSystem.js";
+import { registerEvents } from "./services/Events.js";
+import { initialiseSpriteLayers } from "./system/utils/spriteLayers.js";
+import { LightSystem } from "./system/LightSystem.js";
+import { PerceptionSystem } from "./system/PerceptionSystem.js";
+import { AIScoringSystem } from "./system/AIScoringSystem.js";
+import { CollideSystem } from "./system/CollideSystem.js";
+import { NPCMotionSystem } from "./system/NPCMotionSystem.js";
+import { DebugSystem } from "./system/DebugSystem.js";
+import { PendulumSystem } from "./system/PendulumSystem.js";
+import { TapInputSystem } from "./system/TapInputSystem.js";
+import { pendulumLevel } from "./data/pendulumLevel.js";
 
 export class Whiteroom {
   create() {
-    let entities = [];
-    BasicGame.entities = entities;
+    this.entities = [];
+    initialiseSpriteLayers();
+    BasicGame.entities = this.entities;
     this.movementSystem;
     this.inputSystem;
     this.overlapSystem;
@@ -22,49 +39,84 @@ export class Whiteroom {
     this.trackerSystem;
     console.log("White level loaded");
     BasicGame.service = ServiceLocator;
-    this.eventSystem = new EventBus();
+
+    this.debugSystem = new DebugSystem();
+
+    // Automatically registers to ServiceLocator - needs domain ("system", "game")
+    this.eventSystemGame = new EventBus("game");
 
     // All systems can reach the entity manager via Service locator
-    let entityManager = new EntityManager();
+    this.entityManager = new EntityManager();
 
     // Generate entities from Json
     const prefabFactory = new PrefabFactory(
-      entityManager,
+      this.entityManager,
       componentDefaults,
-      defaultLevel
+      defaultLevel,
+      // pendulumLevel,
     );
-    entities = prefabFactory.loadLevel();
+    this.entities = prefabFactory.loadLevel();
 
     // Create and assign systems
+
+    // this.overlapSystem = new OverlapSystem(
+    //   ["OverlapComponent"],
+    //   ["PlayerComponent"]
+    // );
+
+    // Tidy up
     this.movementSystem = new MotionSystemShip();
     this.inputSystem = new InputSystem(this.movementSystem);
-    this.overlapSystem = new OverlapSystem(
-      ["OverlapComponent"],
-      ["PlayerComponent"]
-    );
     this.triggerSystem = new TriggerSystem(
       ["TriggerComponent"],
-      ["PlayerComponent"]
+      ["TriggerSendComponent"],
     );
     this.inputSystem.addSystemListener(this.triggerSystem);
-    this.trackerSystem = new TrackerSystem();
 
-    BasicGame.test = entities;
+    this.inventorySystem = new InventorySystem();
+    this.cameraSystem = new CameraSystem(this.entities);
+    this.weaponSystem = new WeaponSystem();
+    this.tapInputSystem = new TapInputSystem();
+    this.inputSystem.addSystemListener(this.weaponSystem);
+    this.pendulumSystem = new PendulumSystem();
+
+    this.projectileSystem = new ProjectileSystem(this.entities);
+    this.weaponSystem.addSystemListener(this.projectileSystem);
+    this.ammoSystem = new AmmoSystem(this.entities);
+
+    this.trackerSystem = new TrackerSystem();
+    this.perceptionSystem = new PerceptionSystem();
+    this.AIscoringSystem = new AIScoringSystem();
+    this.NPCMovementSystem = new NPCMotionSystem();
+    // this.perceptionSystem.addSystemListener(this.AIscoringSystem);
+    this.collisionSystem = new CollideSystem();
+    // Testing only
+    BasicGame.entities = this.entities;
     BasicGame.SpriteComponent = SpriteComponent;
-    // entities[0]
-    //   .getComponent("WeaponControllerComponent")
-    //   .switchWeapon(entities[3]);
-    // entities[0]
-    //   .getComponent("WeaponControllerComponent")
-    //   .switchWeapon(entities[3]);
-    entities[0].addComponent(
-      new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
-    );
+    // this.inventorySystem.addItem(this.entities[3], this.entities[0]);
+    // this.weaponSystem.equipWeapon(this.entities[3], this.entities[0]);
+
+    // entities[0].addComponent(
+    //   new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
+    // );
+    this.lightSystem = new LightSystem();
+
+    registerEvents();
   }
 
   update() {
+    this.debugSystem.update();
+    this.inputSystem.update();
+    this.movementSystem.update();
+    this.pendulumSystem.update();
     this.triggerSystem.update();
     this.trackerSystem.update();
+    this.weaponSystem.update();
+    this.perceptionSystem.update();
+    this.NPCMovementSystem.update();
+    this.projectileSystem.update();
+    this.lightSystem.update();
+    this.collisionSystem.update();
   }
 
   preRender() {}
@@ -75,9 +127,7 @@ export class Whiteroom {
   }
 
   shutdown() {
-    // BasicGame.AudioSystem.ResetAudio();
-    // BasicGame.SuperSpriteGroup.destroy(true);
-    // BasicGame.ResetGameSystems(BasicGame.objectGarbageArray);
-    // BasicGame.GlobalSignals.reset_PM_SIGNALS.dispatch();
+    this.inventorySystem.shutdown(this.entities);
+    ServiceLocator.shutDown();
   }
 }

@@ -12,10 +12,28 @@ import { ShipPhysicsComponent } from "../components/ShipPhysicsComponent.js";
 import { ShipExhaustComponent } from "../components/ShipExhaustComponent.js";
 import { WeaponComponent } from "../components/tags/WeaponComponent.js";
 import { WeaponControllerComponent } from "../components/WeaponControllerComponent.js";
-import { InventoryComponent } from "../components/tags/InventoryComponent.js";
+import { InventoryComponent } from "../components/InventoryComponent.js";
 import { TrackerComponent } from "../components/tags/TrackerComponent.js";
 import { CheckConditionComponent } from "../components/CheckConditionComponent.js";
 import { CameraFollowComponent } from "../components/CameraFollowComponent.js";
+import { ProjectileComponent } from "../components/tags/ProjectileComponent.js";
+import { AmmoComponent } from "../components/tags/AmmoComponent.js";
+import { AmmoItemComponent } from "../components/tags/AmmoItemComponent.js";
+import { LightComponent } from "../components/LightComponent.js";
+import { AIStateComponent } from "../components/AIStateComponent.js";
+import { EmotionComponent } from "../components/EmotionComponent.js";
+import { FactionComponent } from "../components/FactionComponent.js";
+import { NotorietyComponent } from "../components/NotorietyComponent.js";
+import { PerceptionComponent } from "../components/PerceptionComponent.js";
+import { HealthComponent } from "../components/HealthComponent.js";
+import { IntelligenceComponent } from "../components/IntelligenceComponent.js";
+import { ShadowComponent } from "../components/tags/ShadowComponent.js";
+import { CollideComponent } from "../components/tags/CollideComponent.js";
+import { PhysicsStaticComponent } from "../components/PhysicsStaticComponent.js";
+import { NPCMotionComponent } from "../components/NPCMotionComponent.js";
+import { NPCComponent } from "../components/tags/NPCComponent.js";
+import { TriggerSendComponent } from "../components/tags/TriggerSendComponent.js";
+import { PendulumStateComponent } from "../components/PendulumStateComponent.js";
 
 export const componentClasses = {
   InputComponent: InputComponent,
@@ -25,7 +43,7 @@ export const componentClasses = {
   SpriteComponent: SpriteComponent,
   StateMovementComponent: StateMovementComponent,
   Position: Position,
-  PhysicsStaticComponent: PhysicsDynamicComponent,
+  PhysicsStaticComponent: PhysicsStaticComponent,
   TriggerComponent: TriggerComponent,
   MovementComponent: MovementComponent,
   MotionShipComponent: MotionShipComponent,
@@ -37,4 +55,21 @@ export const componentClasses = {
   TrackerComponent: TrackerComponent,
   CheckConditionComponent: CheckConditionComponent,
   CameraFollowComponent: CameraFollowComponent,
+  ProjectileComponent: ProjectileComponent,
+  AmmoComponent: AmmoComponent,
+  AmmoItemComponent: AmmoItemComponent,
+  LightComponent: LightComponent,
+  AIStateComponent: AIStateComponent,
+  EmotionComponent: EmotionComponent,
+  FactionComponent: FactionComponent,
+  NotorietyComponent: NotorietyComponent,
+  PerceptionComponent: PerceptionComponent,
+  HealthComponent: HealthComponent,
+  IntelligenceComponent: IntelligenceComponent,
+  ShadowComponent: ShadowComponent,
+  CollideComponent: CollideComponent,
+  NPCMotionComponent: NPCMotionComponent,
+  NPCComponent: NPCComponent,
+  TriggerSendComponent: TriggerSendComponent,
+  PendulumStateComponent: PendulumStateComponent,
 };

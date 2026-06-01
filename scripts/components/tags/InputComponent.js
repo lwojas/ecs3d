@@ -3,5 +3,6 @@ export class InputComponent {
     this.keyPresses = {};
     // this.entity = entity;
     this.keyPressed = false;
+    this.keyCode;
   }
 }

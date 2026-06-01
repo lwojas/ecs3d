@@ -19,4 +19,10 @@ export class ServiceLocator {
       );
     return this.services[category]?.get(name);
   }
+
+  static shutDown() {
+    this.services.game.forEach((service) => {
+      this.services.game.delete(service);
+    });
+  }
 }
