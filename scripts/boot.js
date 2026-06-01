@@ -24,14 +24,16 @@ BasicGame.Boot.prototype = {
     this.load.image("defaultLight", "assets/_light_default.png");
     this.load.image("starfield", "assets/_bg_nebula.png");
     this.load.image("lightShip", "assets/_light_ship2.png");
-    // this.load.image("dyson", "assets/_dyson.png");
+    this.load.image("testRoom", "assets/_test_room.png");
+    this.load.image("mountains", "assets/_bg_flat.png");
+
     // this.load.image("dysonLight", "assets/_light_ship2.png");
   },
 
   create: function () {
     game.stage.backgroundColor = "#999";
     this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL; // Scale the canvas to fit the whole window
-    this.world.setBounds(0, 0, 5000, 5000); // Set the size of the game world - this is not the size of the camera
+    this.world.setBounds(0, 0, 2000, 2000); // Set the size of the game world - this is not the size of the camera
     this.time.advancedTiming = true;
     this.physics.startSystem(Phaser.Physics.ARCADE);
     game.camera.roundPx = false; // stops the sprite from jittering.

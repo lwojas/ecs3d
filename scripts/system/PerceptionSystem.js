@@ -42,7 +42,7 @@ export class PerceptionSystem extends System {
       perceptionComponent.visibleEntities = [];
 
       perceptionComponent.scanList.forEach((sprite) => {
-        if (spriteComponent.sprite === sprite) return;
+        if (spriteComponent.sprite === sprite || !sprite.alive) return;
         // console.log(Math.abs(sprite.x - spriteComponent.sprite.x));
         if (
           Math.abs(sprite.x - spriteComponent.sprite.x) <

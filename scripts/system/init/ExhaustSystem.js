@@ -25,6 +25,7 @@ export class ExhaustSystem {
         // emitter.maxParticleScale = 4;
         emitter.maxParticleSpeed.x = 5;
         emitter.maxParticleSpeed.y = 5;
+
         emitter.minParticleSpeed.x = -5;
         emitter.minParticleSpeed.y = -5;
         emitter.lifespan = 1000;

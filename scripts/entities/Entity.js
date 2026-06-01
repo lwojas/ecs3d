@@ -8,6 +8,7 @@ export class Entity {
     this.id = uniqueId || `entity_${this.tempId}`;
     this.snapshot = {};
     this.components = {};
+    this.isEnabled = true;
     // We need to declare entity manager before we create entities
     this.entityManager = ServiceLocator.resolve("game", "EntityManager");
   }

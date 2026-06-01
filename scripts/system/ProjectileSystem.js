@@ -1,18 +1,25 @@
+import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
 
 export class ProjectileSystem extends System {
   constructor(entities) {
     super();
+    this.projectileArray = [];
     this.projectileCache = new Map();
     entities.forEach((entity) => {
       this.addProjectile(entity);
     });
+    this.entities = this.entityManager.registerSystem(this, [
+      "HealthComponent",
+    ]);
+    console.log(this.projectileArray);
   }
 
   addProjectile(entity) {
     if (!entity.hasComponent("ProjectileComponent")) return;
     let projectileComponent = entity.getComponent("ProjectileComponent");
     let spriteGroup = game.add.group();
+
     spriteGroup.enableBody = true;
     spriteGroup.physicsBodyType = Phaser.Physics.ARCADE;
     spriteGroup.createMultiple(10, projectileComponent.spriteKey);
@@ -25,17 +32,18 @@ export class ProjectileSystem extends System {
     spriteGroup.setAll("outOfBoundsKill", true);
     spriteGroup.setAll("checkWorldBounds", true);
     this.projectileCache.set(projectileComponent.weaponType, spriteGroup);
+    this.projectileArray.push(spriteGroup);
   }
 
-  receiveInteraction(duds, entity) {
-    // console.log(entities);
-    this.fireProjectile(entity);
+  receiveInteraction(duds, [entity, parentEntity]) {
+    // console.log(parentEntity);
+    this.fireProjectile(entity, parentEntity);
     // entities.forEach((entity) => {
     //   this.fireProjectile(entity);
     // });
   }
 
-  fireProjectile(entity) {
+  fireProjectile(entity, parentEntity) {
     // console.log(entity);
     let weaponComponent = entity.getComponent("WeaponComponent");
 
@@ -50,12 +58,43 @@ export class ProjectileSystem extends System {
           weaponComponent.weaponSprite.world.x,
           weaponComponent.weaponSprite.world.y
         );
-        projectile.rotation = game.physics.arcade.moveToPointer(
-          projectile,
-          1000,
-          game.input.activePointer
-        );
+        if (entity.hasComponent("PlayerComponent")) {
+          projectile.rotation = game.physics.arcade.moveToPointer(
+            projectile,
+            1000,
+            game.input.activePointer
+          );
+        } else {
+          game.physics.arcade.velocityFromRotation(
+            parentEntity.getComponent("SpriteComponent").sprite.rotation,
+            2000,
+            projectile.body.velocity
+          );
+        }
+        // console.log(parentEntity);
+        // projectile.rotation =
+        //   parentEntity.getComponent("SpriteComponent").sprite.rotation;
+        // projectile.velocity = 1000;
       }
     }
+  }
+
+  projectileImpact(actor, projectile) {
+    console.log(actor, " has been hit");
+    actor.kill();
+    actor.parentEntity.isEnabled = false;
+    ServiceLocator.resolve("game", "EventSystem").emit(
+      "G_REFRESH_ENTITY_LISTS"
+    );
+  }
+
+  update() {
+    this.collide = game.physics.arcade.collide(
+      this.projectileArray,
+      this.actors,
+      this.projectileImpact,
+      null,
+      this
+    );
   }
 }

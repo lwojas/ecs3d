@@ -26,7 +26,7 @@ export class AIScoringSystem extends System {
     if (fleeScore.score > 0) {
       fleeScore.score = 0;
     }
-    fleeScore.intent = "flee";
+    fleeScore.intent = "FLEE";
 
     const attackScore = targetList.reduce((previous, current) => {
       if (current.score > previous.score) return current;
@@ -36,7 +36,7 @@ export class AIScoringSystem extends System {
       attackScore.score = 0;
     }
 
-    attackScore.intent = "attack";
+    attackScore.intent = "ATTACK";
     // console.log(entity.id, fleeScore);
 
     const suggestedIntent = [fleeScore, attackScore].reduce(
@@ -48,8 +48,16 @@ export class AIScoringSystem extends System {
         }
       }
     );
+    if (!entity.hasComponent("AIStateComponent")) return;
+    const stateComp = entity.getComponent("AIStateComponent");
+    const targetSprite = suggestedIntent.entity.getComponent("SpriteComponent");
+    stateComp.intent = suggestedIntent;
+    stateComp.target = {
+      x: targetSprite.sprite.x,
+      y: targetSprite.sprite.y,
+    };
 
-    // console.log(entity.id);
-    // console.log(entity.id, suggestedIntent);
+    // console.log(entity.id, stateComp.intent.entity);
+    // console.log(suggestedIntent);
   }
 }

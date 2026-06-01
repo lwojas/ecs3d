@@ -28,6 +28,12 @@ import { PerceptionComponent } from "../components/PerceptionComponent.js";
 import { HealthComponent } from "../components/HealthComponent.js";
 import { IntelligenceComponent } from "../components/IntelligenceComponent.js";
 import { ShadowComponent } from "../components/tags/ShadowComponent.js";
+import { CollideComponent } from "../components/tags/CollideComponent.js";
+import { PhysicsStaticComponent } from "../components/PhysicsStaticComponent.js";
+import { NPCMotionComponent } from "../components/NPCMotionComponent.js";
+import { NPCComponent } from "../components/tags/NPCComponent.js";
+import { TriggerSendComponent } from "../components/tags/TriggerSendComponent.js";
+import { PendulumStateComponent } from "../components/PendulumStateComponent.js";
 
 export const componentClasses = {
   InputComponent: InputComponent,
@@ -37,7 +43,7 @@ export const componentClasses = {
   SpriteComponent: SpriteComponent,
   StateMovementComponent: StateMovementComponent,
   Position: Position,
-  PhysicsStaticComponent: PhysicsDynamicComponent,
+  PhysicsStaticComponent: PhysicsStaticComponent,
   TriggerComponent: TriggerComponent,
   MovementComponent: MovementComponent,
   MotionShipComponent: MotionShipComponent,
@@ -61,4 +67,9 @@ export const componentClasses = {
   HealthComponent: HealthComponent,
   IntelligenceComponent: IntelligenceComponent,
   ShadowComponent: ShadowComponent,
+  CollideComponent: CollideComponent,
+  NPCMotionComponent: NPCMotionComponent,
+  NPCComponent: NPCComponent,
+  TriggerSendComponent: TriggerSendComponent,
+  PendulumStateComponent: PendulumStateComponent,
 };

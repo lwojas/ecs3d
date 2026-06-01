@@ -5,5 +5,6 @@ export class WeaponComponent {
     this.weaponType = data.weaponType;
     this.spriteKey = data.spriteKey;
     this.weaponClass = data.weaponClass;
+    this.fireRate = data.fireRate || 1500;
   }
 }

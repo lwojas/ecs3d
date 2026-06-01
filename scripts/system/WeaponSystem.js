@@ -12,6 +12,7 @@ export class WeaponSystem extends System {
     this.entities.forEach((entity) => {
       this.createWeapon(entity);
     });
+    this.weaponTime = 0;
 
     this.weaponControllers = {};
     this.weaponControllers.entities = this.entityManager.registerSystem(this, [
@@ -25,6 +26,11 @@ export class WeaponSystem extends System {
     ServiceLocator.resolve("game", "EventSystem").on(
       "G_SPRITE_UPDATED",
       this.refreshWeapon.bind(this)
+    );
+
+    ServiceLocator.resolve("game", "EventSystem").on(
+      "G_USE_WEAPON",
+      this.useWeapon.bind(this)
     );
   }
 
@@ -93,24 +99,29 @@ export class WeaponSystem extends System {
       "WeaponControllerComponent"
     ).currentWeapon;
     if (!currentWeapon) return;
+    const weaponComponent = currentWeapon.getComponent("WeaponComponent");
 
-    let weaponClass = currentWeapon.getComponent("WeaponComponent").weaponClass;
-    console.log(currentWeapon.getComponent("WeaponComponent"));
-    if (weaponClass === "gun") this.fireGun(entity, currentWeapon);
+    if (game.time.now < this.weaponTime) return;
+    this.weaponTime = game.time.now + weaponComponent.fireRate;
+
+    let weaponClass = weaponComponent.weaponClass;
+    // console.log(currentWeapon.getComponent("WeaponComponent"));
+    if (weaponClass === "gun")
+      this.fireGun(entity, currentWeapon, weaponComponent);
   }
 
-  fireGun(entity, currentWeapon) {
+  fireGun(entity, currentWeapon, weaponComponent) {
     if (!entity.hasComponent("AmmoComponent")) return;
     let ammoInventory = entity.getComponent("AmmoComponent").ammoInventory;
-    let weaponType = currentWeapon.getComponent("WeaponComponent").weaponType;
+    let weaponType = weaponComponent.weaponType;
     let ammoAmount = ammoInventory.get(weaponType);
     console.log(ammoAmount);
-    console.log(currentWeapon);
+    // console.log(currentWeapon);
     if (currentWeapon && ammoAmount) {
       ammoAmount--;
       // A bit heavy
       ammoInventory.set(weaponType, ammoAmount);
-      this.sendInteraction(currentWeapon);
+      this.sendInteraction([currentWeapon, entity]);
     }
   }
 
@@ -120,12 +131,17 @@ export class WeaponSystem extends System {
         "WeaponControllerComponent"
       ).currentWeapon;
       if (weapon) {
-        let sprite = weapon.getComponent("WeaponComponent").weaponSprite;
-        sprite.rotation = game.physics.arcade.angleToPointer(
-          sprite,
-          game.input.activePointer,
-          true
-        );
+        const sprite = weapon.getComponent("WeaponComponent").weaponSprite;
+        if (entity.hasComponent("PlayerComponent")) {
+          sprite.rotation = game.physics.arcade.angleToPointer(
+            sprite,
+            game.input.activePointer,
+            true
+          );
+        } else {
+          const spriteComp = entity.getComponent("SpriteComponent");
+          sprite.rotation = spriteComp.sprite.rotation;
+        }
       }
     });
   }

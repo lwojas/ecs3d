@@ -1,12 +1,12 @@
 export const defaultLevel = {
   entities: [
-    // {
-    //   type: "background",
-    //   components: {
-    //     Position: { x: 0, y: 0 },
-    //     SpriteComponent: { spriteKey: "starfield", layer: "bg0", scale: 4 },
-    //   },
-    // },
+    {
+      type: "background",
+      components: {
+        Position: { x: -800, y: -500 },
+        SpriteComponent: { spriteKey: "starfield", layer: "bg0", scale: 4 },
+      },
+    },
     // {
     //   type: "background",
     //   components: {
@@ -47,6 +47,28 @@ export const defaultLevel = {
     },
 
     {
+      type: "background",
+      components: {
+        Position: { x: 700, y: 500 },
+        SpriteComponent: {
+          spriteKey: "testRoom",
+          layer: "fg3",
+          scale: 1,
+        },
+        ShadowComponent: { sprite: "testRoom", scale: 1, complex: true },
+        // CollideComponent: {},
+        PhysicsStaticComponent: {},
+        // LightComponent: {
+        //   sprites: [
+        //     { scale: 4, sprite: "defaultLight" },
+        //     // { scale: 1, sprite: "lightShip" },
+        //   ],
+        //   castShadows: true,
+        // },
+      },
+    },
+
+    {
       type: "player_ship",
       uniqueId: "player_1",
       components: {
@@ -67,9 +89,20 @@ export const defaultLevel = {
 
     {
       type: "pirate",
+      amount: 10,
+      spread: true,
       uniqueId: "pirate_test",
       components: {
         Position: { x: 300, y: 300 },
+        LightComponent: {
+          sprites: [
+            // { scale: 4, sprite: "defaultLight" },
+            { scale: 1, sprite: "lightShip" },
+          ],
+          castShadows: true,
+          isSpot: true,
+        },
+        TriggerSendComponent: {},
       },
     },
 
@@ -77,7 +110,27 @@ export const defaultLevel = {
       type: "trader",
       uniqueId: "trader_test",
       components: {
-        Position: { x: 400, y: 400 },
+        Position: { x: 400, y: 500 },
+      },
+    },
+
+    {
+      type: "trader",
+      components: {
+        Position: { x: 500, y: 500 },
+      },
+    },
+    {
+      type: "trader",
+      components: {
+        Position: { x: 600, y: 500 },
+      },
+    },
+
+    {
+      type: "trader",
+      components: {
+        Position: { x: 700, y: 500 },
       },
     },
 
@@ -128,6 +181,19 @@ export const defaultLevel = {
       uniqueId: "test_turret",
       components: {
         Position: { x: 300, y: 100 },
+        SpriteComponent: { spriteKey: "shipTurretDefault" },
+        WeaponComponent: {
+          spriteKey: "shipTurretDefault",
+          weaponType: "canon",
+          weaponClass: "gun",
+        },
+      },
+    },
+    {
+      type: "trigger",
+      uniqueId: "npc_turret",
+      components: {
+        Position: { x: 300, y: 300 },
         SpriteComponent: { spriteKey: "shipTurretDefault" },
         WeaponComponent: {
           spriteKey: "shipTurretDefault",

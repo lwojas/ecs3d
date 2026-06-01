@@ -1,5 +1,6 @@
 import { ServiceLocator } from "./ServiceLocator.js";
 import { InitManager } from "../system/init/InitManager.js";
+import { componentClasses } from "./ComponentClasses.js";
 
 export class EntityManager {
   constructor() {
@@ -11,6 +12,10 @@ export class EntityManager {
     this.systemEntityLists = new Map();
     this.isBatching = false; // Flag to delay updates
     this.dirtyEntities = new Set(); // Track changed entities
+    ServiceLocator.resolve("game", "EventSystem").on(
+      "G_REFRESH_ENTITY_LISTS",
+      this.updateEntityLists.bind(this)
+    );
   }
 
   addEntity(entity) {
@@ -36,10 +41,20 @@ export class EntityManager {
           worldEnity.hasComponent(comp)
         );
         if (hasAllComponents) {
-          newList.push(worldEnity);
+          if (worldEnity.isEnabled) {
+            newList.push(worldEnity);
+          }
         }
       });
+      system.componentLists = {};
+      system.requiredComponents.forEach((component) => {
+        system.componentLists[component] = this.makeComponentList(
+          newList,
+          component
+        );
+      });
       system.actors = this.makeSpriteList(newList);
+      system.cachedComponents = this.makeComponentList(newList);
       system.entities = newList;
       entityList = newList;
       if (system.refreshList) system.refreshList();
@@ -48,12 +63,32 @@ export class EntityManager {
 
   registerSystem(system, requiredComponents) {
     system.requiredComponents = requiredComponents;
+    console.log(requiredComponents);
     const filteredEntities = [...this.world].filter((entity) =>
-      requiredComponents.every((comp) => entity.hasComponent(comp))
+      requiredComponents.every(
+        (comp) => entity.hasComponent(comp) && entity.isEnabled
+      )
     );
+    requiredComponents.forEach((component) => {
+      if (!system.componentLists) system.componentLists = {};
+      system.componentLists[component] = this.makeComponentList(
+        filteredEntities,
+        component
+      );
+    });
+
     this.systemEntityLists.set(system, filteredEntities);
     system.actors = this.makeSpriteList(filteredEntities);
+
     return filteredEntities;
+  }
+
+  makeComponentList(entities, componentName) {
+    let compList = entities.map((entity) => {
+      const comp = entity.getComponent(componentName);
+      if (comp) return comp;
+    });
+    return compList;
   }
 
   makeSpriteList(entities) {

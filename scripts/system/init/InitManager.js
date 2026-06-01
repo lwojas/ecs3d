@@ -21,7 +21,7 @@ export class InitManager {
     this.physicsManager.addDynamicBody(entity);
     this.physicsManager.addStaticBody(entity);
     this.exhaustSystem.createExhaust(entity);
-    followEntity(entity);
+    if (entity.hasComponent("PlayerComponent")) followEntity(entity);
     ServiceLocator.resolve("game", "EventSystem").emit(
       "G_SPRITE_UPDATED",
       entity

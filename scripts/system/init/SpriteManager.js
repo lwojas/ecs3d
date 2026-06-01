@@ -14,7 +14,7 @@ export class SpriteManager {
       console.log("Destroying sprite");
     }
     let position = entity.getComponent("Position") || { x: 100, y: 100 };
-    console.log(position);
+    // console.log(position);
     const sprite = game.add.sprite(
       position.x,
       position.y,
@@ -22,6 +22,8 @@ export class SpriteManager {
     );
 
     sprite.scale.setTo(spriteComponent.scale);
+    sprite.fixedToCamera = spriteComponent.fixed;
+    console.log(entity.id, spriteComponent.fixed);
 
     spriteLayers[spriteComponent.layer].add(sprite);
 

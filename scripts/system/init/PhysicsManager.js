@@ -1,3 +1,6 @@
+import { attachRectangleBodies } from "../utils/generatePhysicsBodies.js";
+import { decomposeWhiteToRectangles } from "../utils/tracePhysics.js";
+
 export class PhysicsManager {
   constructor() {}
 
@@ -21,14 +24,36 @@ export class PhysicsManager {
 
   addStaticBody(entity) {
     if (
-      entity.hasComponent("SpriteComponent") &&
-      entity.hasComponent("PhysicsStaticComponent")
-    ) {
-      let sprite = entity.getComponent("SpriteComponent").sprite;
-      // console.log(sprite);
-      game.physics.arcade.enable(sprite);
-      sprite.body.immovable = true;
+      !entity.hasComponent("SpriteComponent") ||
+      !entity.hasComponent("PhysicsStaticComponent")
+    )
+      return;
+    const staticComp = entity.getComponent("PhysicsStaticComponent");
+
+    let spriteComp = entity.getComponent("SpriteComponent");
+    if (staticComp.complex) {
+      const img = game.cache.getImage(spriteComp.spriteKey);
+
+      // Draw to canvas to read alpha
+      const temp = document.createElement("canvas");
+      temp.width = img.width;
+      temp.height = img.height;
+      const ctx = temp.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      let rectangles = decomposeWhiteToRectangles(imageData);
+      staticComp.collisionObject = attachRectangleBodies(
+        spriteComp.sprite,
+        rectangles,
+        true
+      );
+    } else {
+      game.physics.arcade.enable(spriteComp.sprite);
+      spriteComp.sprite.body.immovable = true;
+      staticComp.collisionObject = spriteComp.sprite;
     }
+    // console.log(sprite);
   }
 
   addShipPhysics(entity) {

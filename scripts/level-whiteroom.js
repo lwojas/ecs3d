@@ -20,6 +20,12 @@ import { initialiseSpriteLayers } from "./system/utils/spriteLayers.js";
 import { LightSystem } from "./system/LightSystem.js";
 import { PerceptionSystem } from "./system/PerceptionSystem.js";
 import { AIScoringSystem } from "./system/AIScoringSystem.js";
+import { CollideSystem } from "./system/CollideSystem.js";
+import { NPCMotionSystem } from "./system/NPCMotionSystem.js";
+import { DebugSystem } from "./system/DebugSystem.js";
+import { PendulumSystem } from "./system/PendulumSystem.js";
+import { TapInputSystem } from "./system/TapInputSystem.js";
+import { pendulumLevel } from "./data/pendulumLevel.js";
 
 export class Whiteroom {
   create() {
@@ -34,6 +40,8 @@ export class Whiteroom {
     console.log("White level loaded");
     BasicGame.service = ServiceLocator;
 
+    this.debugSystem = new DebugSystem();
+
     // Automatically registers to ServiceLocator - needs domain ("system", "game")
     this.eventSystemGame = new EventBus("game");
 
@@ -44,7 +52,8 @@ export class Whiteroom {
     const prefabFactory = new PrefabFactory(
       this.entityManager,
       componentDefaults,
-      defaultLevel
+      defaultLevel,
+      // pendulumLevel,
     );
     this.entities = prefabFactory.loadLevel();
 
@@ -60,14 +69,16 @@ export class Whiteroom {
     this.inputSystem = new InputSystem(this.movementSystem);
     this.triggerSystem = new TriggerSystem(
       ["TriggerComponent"],
-      ["PlayerComponent"]
+      ["TriggerSendComponent"],
     );
     this.inputSystem.addSystemListener(this.triggerSystem);
 
     this.inventorySystem = new InventorySystem();
     this.cameraSystem = new CameraSystem(this.entities);
     this.weaponSystem = new WeaponSystem();
+    this.tapInputSystem = new TapInputSystem();
     this.inputSystem.addSystemListener(this.weaponSystem);
+    this.pendulumSystem = new PendulumSystem();
 
     this.projectileSystem = new ProjectileSystem(this.entities);
     this.weaponSystem.addSystemListener(this.projectileSystem);
@@ -76,8 +87,9 @@ export class Whiteroom {
     this.trackerSystem = new TrackerSystem();
     this.perceptionSystem = new PerceptionSystem();
     this.AIscoringSystem = new AIScoringSystem();
+    this.NPCMovementSystem = new NPCMotionSystem();
     // this.perceptionSystem.addSystemListener(this.AIscoringSystem);
-
+    this.collisionSystem = new CollideSystem();
     // Testing only
     BasicGame.entities = this.entities;
     BasicGame.SpriteComponent = SpriteComponent;
@@ -88,17 +100,23 @@ export class Whiteroom {
     //   new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
     // );
     this.lightSystem = new LightSystem();
+
     registerEvents();
   }
 
   update() {
+    this.debugSystem.update();
     this.inputSystem.update();
     this.movementSystem.update();
+    this.pendulumSystem.update();
     this.triggerSystem.update();
     this.trackerSystem.update();
     this.weaponSystem.update();
     this.perceptionSystem.update();
+    this.NPCMovementSystem.update();
+    this.projectileSystem.update();
     this.lightSystem.update();
+    this.collisionSystem.update();
   }
 
   preRender() {}

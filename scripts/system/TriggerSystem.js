@@ -12,6 +12,7 @@ export class TriggerSystem extends System {
       this.targetSystem,
       targetComponents
     );
+    // console.log(this.targetSystem);
     ServiceLocator.register("game", "TriggerSystem", this);
   }
 
@@ -26,6 +27,7 @@ export class TriggerSystem extends System {
   }
 
   triggerEvent(triggerSprite, targetSprite) {
+    // console.log("Trigger Firing");
     let triggerEntity = triggerSprite.parentEntity;
     let triggerComponent = triggerEntity.getComponent("TriggerComponent");
     if (!triggerComponent.enabled) return;

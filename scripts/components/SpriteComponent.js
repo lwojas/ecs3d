@@ -6,6 +6,7 @@ export class SpriteComponent {
     this.entity = entity;
     this.layer = data.layer || "fg0";
     this.scale = data.scale || 1;
+    this.fixed = data.fixed || false;
   }
 
   unmount() {
