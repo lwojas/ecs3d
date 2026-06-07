@@ -8,11 +8,12 @@ export class AIScoringSystem extends System {
 
     ServiceLocator.resolve("game", "EventSystem").on(
       "G_PERCEPTION_PULSE",
-      this.startScoring.bind(this)
+      this.startScoring.bind(this),
     );
   }
 
   startScoring(entity, entityList) {
+    console.log(entityList);
     const targetList = entityList.map((targetEntity) => {
       return { entity: targetEntity, score: scoreEntity(entity, targetEntity) };
     });
@@ -46,7 +47,7 @@ export class AIScoringSystem extends System {
         } else {
           return previous;
         }
-      }
+      },
     );
     if (!entity.hasComponent("AIStateComponent")) return;
     const stateComp = entity.getComponent("AIStateComponent");

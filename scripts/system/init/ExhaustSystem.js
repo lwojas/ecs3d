@@ -43,6 +43,12 @@ export class ExhaustSystem {
     }
   }
 
+  stopExhaust(entity) {
+    if (this.exhaustEntities.has(entity)) {
+      this.exhaustEntities.get(entity).on = false;
+    }
+  }
+
   refreshComponent(entity) {
     console.log(entity);
     let sprite = entity.getComponent("SpriteComponent").sprite;
@@ -56,8 +62,8 @@ export class ExhaustSystem {
       new TrackerComponent(
         entity,
         entity.getComponent("ShipExhaustComponent").emitter,
-        offSet
-      )
+        offSet,
+      ),
     );
     // this.trackerComponent = entity.getComponent("TrackerComponent");
   }

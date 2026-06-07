@@ -18,7 +18,7 @@ export class SpriteManager {
     const sprite = game.add.sprite(
       position.x,
       position.y,
-      spriteComponent.spriteKey
+      spriteComponent.spriteKey,
     );
 
     sprite.scale.setTo(spriteComponent.scale);
@@ -30,5 +30,13 @@ export class SpriteManager {
     sprite.parentEntity = entity;
     spriteComponent.sprite = sprite;
     this.entities.set(entity, sprite);
+  }
+
+  killSprite(entity) {
+    const sprite = this.entities.get(entity);
+    if (sprite) {
+      sprite.kill();
+      // this.entities.delete(entity);
+    }
   }
 }

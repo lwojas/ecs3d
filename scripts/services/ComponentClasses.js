@@ -34,6 +34,8 @@ import { NPCMotionComponent } from "../components/NPCMotionComponent.js";
 import { NPCComponent } from "../components/tags/NPCComponent.js";
 import { TriggerSendComponent } from "../components/tags/TriggerSendComponent.js";
 import { PendulumStateComponent } from "../components/PendulumStateComponent.js";
+import { DamageComponent } from "../components/tags/DamageComponent.js";
+import { PatrolComponent } from "../components/PatrolComponent.js";
 
 export const componentClasses = {
   InputComponent: InputComponent,
@@ -72,4 +74,6 @@ export const componentClasses = {
   NPCComponent: NPCComponent,
   TriggerSendComponent: TriggerSendComponent,
   PendulumStateComponent: PendulumStateComponent,
+  DamageComponent: DamageComponent,
+  PatrolComponent: PatrolComponent,
 };

@@ -15,6 +15,15 @@ export class InitManager {
     // });
   }
 
+  killEntity(entity) {
+    if (entity.hasComponent("SpriteComponent")) {
+      this.spriteManager.killSprite(entity);
+    }
+    if (entity.hasComponent("ShipExhaustComponent")) {
+      this.exhaustSystem.stopExhaust(entity);
+    }
+  }
+
   initEntity(entity) {
     if (!entity.hasComponent("SpriteComponent")) return;
     this.spriteManager.createSprite(entity);
@@ -24,7 +33,7 @@ export class InitManager {
     if (entity.hasComponent("PlayerComponent")) followEntity(entity);
     ServiceLocator.resolve("game", "EventSystem").emit(
       "G_SPRITE_UPDATED",
-      entity
+      entity,
     );
     const spriteComponent = entity.getComponent("SpriteComponent");
     if (!spriteComponent.enabled) spriteComponent.sprite.kill();
