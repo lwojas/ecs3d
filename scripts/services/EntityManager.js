@@ -14,7 +14,7 @@ export class EntityManager {
     this.dirtyEntities = new Set(); // Track changed entities
     ServiceLocator.resolve("game", "EventSystem").on(
       "G_REFRESH_ENTITY_LISTS",
-      this.updateEntityLists.bind(this)
+      this.updateEntityLists.bind(this),
     );
   }
 
@@ -38,7 +38,7 @@ export class EntityManager {
       this.world.forEach((worldEnity) => {
         const requiredComponents = system.requiredComponents;
         const hasAllComponents = requiredComponents.every((comp) =>
-          worldEnity.hasComponent(comp)
+          worldEnity.hasComponent(comp),
         );
         if (hasAllComponents) {
           if (worldEnity.isEnabled) {
@@ -50,7 +50,7 @@ export class EntityManager {
       system.requiredComponents.forEach((component) => {
         system.componentLists[component] = this.makeComponentList(
           newList,
-          component
+          component,
         );
       });
       system.actors = this.makeSpriteList(newList);
@@ -66,14 +66,14 @@ export class EntityManager {
     console.log(requiredComponents);
     const filteredEntities = [...this.world].filter((entity) =>
       requiredComponents.every(
-        (comp) => entity.hasComponent(comp) && entity.isEnabled
-      )
+        (comp) => entity.hasComponent(comp) && entity.isEnabled,
+      ),
     );
     requiredComponents.forEach((component) => {
       if (!system.componentLists) system.componentLists = {};
       system.componentLists[component] = this.makeComponentList(
         filteredEntities,
-        component
+        component,
       );
     });
 

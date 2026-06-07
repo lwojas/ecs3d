@@ -1,6 +1,8 @@
 import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
 import { drawDebugLine } from "./utils/debugTools.js";
+import { isWithinRange } from "./utils/rangeTools.js";
+import { getPatrolActions } from "./utils/patrolActions.js";
 
 export class NPCMotionSystem extends System {
   constructor() {
@@ -22,19 +24,34 @@ export class NPCMotionSystem extends System {
     const spriteComponent = entity.getComponent("SpriteComponent");
     const targetSprite =
       stateComponent.intent.entity.getComponent("SpriteComponent").sprite;
+    // console.log(targetSprite.alive);
+    if (!targetSprite.alive) {
+      stateComponent.intent.intent = "PATROL";
+      if (stateComponent.intent.entity.hasComponent("PlayerComponent")) {
+        game.camera.follow(spriteComponent.sprite);
+      }
+    }
     const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
     var angle = game.physics.arcade.angleBetween(
       spriteComponent.sprite,
       targetSprite,
     );
     spriteComponent.sprite.rotation = angle;
-    // drawDebugLine(
-    //   this.debugSystem.debugData.ctx,
-    //   spriteComponent.sprite.x,
-    //   spriteComponent.sprite.y,
-    //   targetSprite.x,
-    //   targetSprite.y
-    // );
+    if (isWithinRange(spriteComponent.sprite, targetSprite, 400)) {
+      drawDebugLine(
+        this.debugSystem.debugData.ctx,
+        spriteComponent.sprite.x,
+        spriteComponent.sprite.y,
+        targetSprite.x,
+        targetSprite.y,
+      );
+      // console.log("In range to attack");
+      ServiceLocator.resolve("game", "EventSystem").emit(
+        "G_USE_WEAPON",
+        entity,
+      );
+    }
+
     // ServiceLocator.resolve("game", "EventSystem").emit("G_USE_WEAPON", entity);
     // console.log(stateComponent);
     game.physics.arcade.accelerationFromRotation(
@@ -65,6 +82,43 @@ export class NPCMotionSystem extends System {
       spriteComponent.sprite.body.acceleration,
     );
     // spriteComponent.sprite.body.velocity.y = 30;
+  }
+
+  PATROL(entity) {
+    const patrolComponent = entity.getComponent("PatrolComponent");
+    if (!patrolComponent) return;
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    const movementComponent = entity.getComponent("MovementComponent");
+
+    const patrolActions = getPatrolActions();
+    const points = patrolActions[patrolComponent.currentPatrolAction].points;
+    if (!points) return;
+
+    const sprite = spriteComponent.sprite;
+    const target = points[patrolComponent.currentIndex];
+
+    const distance = game.physics.arcade.distanceToXY(
+      sprite,
+      target.x,
+      target.y,
+    );
+
+    // Move to next patrol point
+    if (distance < 25) {
+      patrolComponent.currentIndex =
+        (patrolComponent.currentIndex + 1) % points.length;
+      return;
+    }
+
+    const angle = game.physics.arcade.angleToXY(sprite, target.x, target.y);
+
+    sprite.rotation = angle;
+
+    game.physics.arcade.accelerationFromRotation(
+      angle,
+      movementComponent?.maxSpeed || 75,
+      sprite.body.acceleration,
+    );
   }
 
   IDLE(entity) {

@@ -4,5 +4,6 @@ export class ProjectileComponent {
     this.name = data.name;
     this.spriteKey = data.spriteKey;
     this.weaponType = data.weaponType;
+    this.damage = data.damage;
   }
 }

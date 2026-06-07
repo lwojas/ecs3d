@@ -4,7 +4,7 @@ export const componentDefaults = {
     InputComponent: "",
     AmmoComponent: {
       ammoTypes: [
-        { type: "canon", amount: 10, props: { power: 100, speed: 300 } },
+        { type: "canon", amount: 1000, props: { power: 100, speed: 300 } },
       ],
     },
     InventoryComponent: {},
@@ -48,7 +48,7 @@ export const componentDefaults = {
     },
     AmmoComponent: {
       ammoTypes: [
-        { type: "canon", amount: 10, props: { power: 100, speed: 300 } },
+        { type: "canon", amount: 1000, props: { power: 100, speed: 300 } },
       ],
     },
     InventoryComponent: {},
@@ -59,6 +59,10 @@ export const componentDefaults = {
     AIStateComponent: {},
     NPCMotionComponent: {},
     CollideComponent: {},
+    PatrolComponent: {
+      currentIndex: 0,
+      currentPatrolAction: "default",
+    },
   },
 
   trader: {
@@ -107,9 +111,11 @@ export const componentDefaults = {
     ProjectileComponent: {
       spriteKey: "pixelWhite",
       weaponType: "canon", // "canon || missile || energy"
+      damage: 20,
       // weaponType: "",
       // power: 90,
       // lifeTime: 4,
     },
+    DamageComponent: { amount: 20 },
   },
 };

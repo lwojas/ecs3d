@@ -1,5 +1,6 @@
 import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
+import { damageEntity } from "./utils/damageEntity.js";
 
 export class ProjectileSystem extends System {
   constructor(entities) {
@@ -31,6 +32,7 @@ export class ProjectileSystem extends System {
     spriteGroup.setAll("outOfCameraBoundsKill", true);
     spriteGroup.setAll("outOfBoundsKill", true);
     spriteGroup.setAll("checkWorldBounds", true);
+    spriteGroup.setAll("parentEntity", entity, false, false, 0, true);
     this.projectileCache.set(projectileComponent.weaponType, spriteGroup);
     this.projectileArray.push(spriteGroup);
   }
@@ -49,26 +51,26 @@ export class ProjectileSystem extends System {
 
     if (this.projectileCache.has(weaponComponent.weaponType)) {
       let projectileGroup = this.projectileCache.get(
-        weaponComponent.weaponType
+        weaponComponent.weaponType,
       );
       let projectile = projectileGroup.getFirstExists(false);
       if (projectile) {
         console.log("--Firing projectile");
         projectile.reset(
           weaponComponent.weaponSprite.world.x,
-          weaponComponent.weaponSprite.world.y
+          weaponComponent.weaponSprite.world.y,
         );
         if (entity.hasComponent("PlayerComponent")) {
           projectile.rotation = game.physics.arcade.moveToPointer(
             projectile,
             1000,
-            game.input.activePointer
+            game.input.activePointer,
           );
         } else {
           game.physics.arcade.velocityFromRotation(
             parentEntity.getComponent("SpriteComponent").sprite.rotation,
             2000,
-            projectile.body.velocity
+            projectile.body.velocity,
           );
         }
         // console.log(parentEntity);
@@ -81,11 +83,14 @@ export class ProjectileSystem extends System {
 
   projectileImpact(actor, projectile) {
     console.log(actor, " has been hit");
-    actor.kill();
-    actor.parentEntity.isEnabled = false;
-    ServiceLocator.resolve("game", "EventSystem").emit(
-      "G_REFRESH_ENTITY_LISTS"
-    );
+    damageEntity(actor, projectile);
+    projectile.kill();
+    // actor.kill();
+    // actor.parentEntity.isEnabled = false;
+
+    // ServiceLocator.resolve("game", "EventSystem").emit(
+    //   "G_REFRESH_ENTITY_LISTS",
+    // );
   }
 
   update() {
@@ -94,7 +99,7 @@ export class ProjectileSystem extends System {
       this.actors,
       this.projectileImpact,
       null,
-      this
+      this,
     );
   }
 }
