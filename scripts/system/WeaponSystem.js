@@ -20,17 +20,17 @@ export class WeaponSystem extends System {
     ]);
     ServiceLocator.resolve("game", "EventSystem").on(
       "G_EQUIP_WEAPON",
-      this.equipWeapon
+      this.equipWeapon,
     );
 
     ServiceLocator.resolve("game", "EventSystem").on(
       "G_SPRITE_UPDATED",
-      this.refreshWeapon.bind(this)
+      this.refreshWeapon.bind(this),
     );
 
     ServiceLocator.resolve("game", "EventSystem").on(
       "G_USE_WEAPON",
-      this.useWeapon.bind(this)
+      this.useWeapon.bind(this),
     );
   }
 
@@ -38,7 +38,7 @@ export class WeaponSystem extends System {
     // If we change the player sprite
     if (!entity.hasComponent("WeaponControllerComponent")) return;
     const currentWeapon = entity.getComponent(
-      "WeaponControllerComponent"
+      "WeaponControllerComponent",
     ).currentWeapon;
     if (currentWeapon) {
       console.log(this);
@@ -51,7 +51,7 @@ export class WeaponSystem extends System {
     weaponComponent.weaponSprite = game.add.sprite(
       100,
       100,
-      weaponComponent.spriteKey
+      weaponComponent.spriteKey,
     );
     spriteLayers.fg4.add(weaponComponent.weaponSprite);
     // console.log("Weapon sprite created");
@@ -80,8 +80,8 @@ export class WeaponSystem extends System {
         new TrackerComponent(
           weaponEntity,
           weaponEntity.getComponent("WeaponComponent").weaponSprite,
-          entity.getComponent("SpriteComponent").sprite
-        )
+          entity.getComponent("SpriteComponent").sprite,
+        ),
       );
     }
   }
@@ -94,9 +94,9 @@ export class WeaponSystem extends System {
   }
 
   useWeapon(entity) {
-    if (!entity.getComponent("WeaponControllerComponent")) return;
+    if (!entity.hasComponent("WeaponControllerComponent")) return;
     let currentWeapon = entity.getComponent(
-      "WeaponControllerComponent"
+      "WeaponControllerComponent",
     ).currentWeapon;
     if (!currentWeapon) return;
     const weaponComponent = currentWeapon.getComponent("WeaponComponent");
@@ -128,7 +128,7 @@ export class WeaponSystem extends System {
   update() {
     this.weaponControllers.entities.forEach((entity, index) => {
       let weapon = entity.getComponent(
-        "WeaponControllerComponent"
+        "WeaponControllerComponent",
       ).currentWeapon;
       if (weapon) {
         const sprite = weapon.getComponent("WeaponComponent").weaponSprite;
@@ -136,7 +136,7 @@ export class WeaponSystem extends System {
           sprite.rotation = game.physics.arcade.angleToPointer(
             sprite,
             game.input.activePointer,
-            true
+            true,
           );
         } else {
           const spriteComp = entity.getComponent("SpriteComponent");

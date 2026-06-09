@@ -6,5 +6,6 @@ export class WeaponComponent {
     this.spriteKey = data.spriteKey;
     this.weaponClass = data.weaponClass;
     this.fireRate = data.fireRate || 1500;
+    this.range = data.range || 300;
   }
 }

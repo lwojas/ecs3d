@@ -32,7 +32,8 @@ export class NPCMotionSystem extends System {
         game.camera.follow(sprite);
       }
     }
-    moveSpriteByRotation(sprite, targetSprite);
+    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+    moveSpriteByRotation(sprite, targetSprite, maxSpeed);
 
     if (isWithinRange(sprite, targetSprite, 400)) {
       drawDebugLine(
@@ -73,24 +74,14 @@ export class NPCMotionSystem extends System {
   }
 
   MOVETO(entity, stateComponent) {
+    if (!entity.hasComponent("TargetComponent")) return;
     const spriteComponent = entity.getComponent("SpriteComponent");
     const target = entity.getComponent("TargetComponent")?.target;
     const targetSprite = target.getComponent("SpriteComponent")?.sprite;
     const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
-    moveSpriteByRotation(spriteComponent.sprite, targetSprite);
+    moveSpriteByRotation(spriteComponent.sprite, targetSprite, maxSpeed);
     if (!entity.hasComponent("ShipExhaustComponent")) return;
     entity.getComponent("ShipExhaustComponent").emitter.on = true;
-    // var angle = game.physics.arcade.angleBetween(
-    //   spriteComponent.sprite,
-    //   targetSprite,
-    // );
-    // spriteComponent.sprite.rotation = angle;
-    // game.physics.arcade.accelerationFromRotation(
-    //   spriteComponent.sprite.rotation,
-    //   maxSpeed,
-    //   spriteComponent.sprite.body.acceleration,
-    // );
-    // spriteComponent.sprite.body.angularVelocity = 0;
   }
 
   PATROL(entity) {
