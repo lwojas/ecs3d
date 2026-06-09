@@ -27,6 +27,7 @@ import { PendulumSystem } from "./system/PendulumSystem.js";
 import { TapInputSystem } from "./system/TapInputSystem.js";
 import { pendulumLevel } from "./data/pendulumLevel.js";
 import { KillSystem } from "./system/KillSystem.js";
+import { GoalSystem } from "./system/GoalSystem.js";
 
 export class Whiteroom {
   create() {
@@ -91,6 +92,7 @@ export class Whiteroom {
     this.NPCMovementSystem = new NPCMotionSystem();
     // this.perceptionSystem.addSystemListener(this.AIscoringSystem);
     this.collisionSystem = new CollideSystem();
+    this.goalSystem = new GoalSystem(this.entities);
     this.killSystem = new KillSystem();
     // Testing only
     BasicGame.entities = this.entities;

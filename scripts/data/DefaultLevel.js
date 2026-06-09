@@ -103,6 +103,7 @@ export const defaultLevel = {
           isSpot: true,
         },
         TriggerSendComponent: {},
+        GoalComponent: { type: "escort_player" },
       },
     },
 

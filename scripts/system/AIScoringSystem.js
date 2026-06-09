@@ -1,6 +1,7 @@
 import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
 import { scoreEntity } from "./utils/AIScoring.js";
+import { setAIState } from "./utils/AIState.js";
 
 export class AIScoringSystem extends System {
   constructor() {
@@ -52,11 +53,15 @@ export class AIScoringSystem extends System {
     if (!entity.hasComponent("AIStateComponent")) return;
     const stateComp = entity.getComponent("AIStateComponent");
     const targetSprite = suggestedIntent.entity.getComponent("SpriteComponent");
-    stateComp.intent = suggestedIntent;
+    stateComp.decision = suggestedIntent;
     stateComp.target = {
       x: targetSprite.sprite.x,
       y: targetSprite.sprite.y,
     };
+    const targetComp = entity.getComponent("TargetComponent");
+    if (!targetComp) return;
+    targetComp.target = suggestedIntent.entity;
+    setAIState(entity);
 
     // console.log(entity.id, stateComp.intent.entity);
     // console.log(suggestedIntent);

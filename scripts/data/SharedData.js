@@ -34,6 +34,7 @@ export const componentDefaults = {
   pirate: {
     SpriteComponent: { spriteKey: "Cobra" },
     PhysicsDynamicComponent: {},
+    TargetComponent: {},
     ShipExhaustComponent: { spriteKey: "pixelWhite" },
     PerceptionComponent: {},
     FactionComponent: {
@@ -63,12 +64,14 @@ export const componentDefaults = {
       currentIndex: 0,
       currentPatrolAction: "default",
     },
+    GoalComponent: {},
   },
 
   trader: {
     SpriteComponent: { spriteKey: "Cobra" },
     PhysicsDynamicComponent: {},
     ShipExhaustComponent: { spriteKey: "pixelWhite" },
+    TargetComponent: {},
     PerceptionComponent: {},
     FactionComponent: {
       // allegiance: "pirate",
