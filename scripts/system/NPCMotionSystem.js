@@ -3,6 +3,7 @@ import { System } from "./System.js";
 import { drawDebugLine } from "./utils/debugTools.js";
 import { isWithinRange } from "./utils/rangeTools.js";
 import { getPatrolActions } from "./utils/patrolActions.js";
+import { moveSpriteByRotation } from "./utils/spriteMovement.js";
 
 export class NPCMotionSystem extends System {
   constructor() {
@@ -21,27 +22,23 @@ export class NPCMotionSystem extends System {
 
   ATTACK(entity, stateComponent) {
     // console.log("NPC ATTACK firing");
-    const spriteComponent = entity.getComponent("SpriteComponent");
+    const sprite = entity.getComponent("SpriteComponent").sprite;
     const targetSprite =
-      stateComponent.intent.entity.getComponent("SpriteComponent").sprite;
+      stateComponent.decision.entity.getComponent("SpriteComponent").sprite;
     // console.log(targetSprite.alive);
     if (!targetSprite.alive) {
-      stateComponent.intent.intent = "PATROL";
-      if (stateComponent.intent.entity.hasComponent("PlayerComponent")) {
-        game.camera.follow(spriteComponent.sprite);
+      stateComponent.state = "PATROL";
+      if (stateComponent.decision.entity.hasComponent("PlayerComponent")) {
+        game.camera.follow(sprite);
       }
     }
-    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
-    var angle = game.physics.arcade.angleBetween(
-      spriteComponent.sprite,
-      targetSprite,
-    );
-    spriteComponent.sprite.rotation = angle;
-    if (isWithinRange(spriteComponent.sprite, targetSprite, 400)) {
+    moveSpriteByRotation(sprite, targetSprite);
+
+    if (isWithinRange(sprite, targetSprite, 400)) {
       drawDebugLine(
         this.debugSystem.debugData.ctx,
-        spriteComponent.sprite.x,
-        spriteComponent.sprite.y,
+        sprite.x,
+        sprite.y,
         targetSprite.x,
         targetSprite.y,
       );
@@ -51,15 +48,6 @@ export class NPCMotionSystem extends System {
         entity,
       );
     }
-
-    // ServiceLocator.resolve("game", "EventSystem").emit("G_USE_WEAPON", entity);
-    // console.log(stateComponent);
-    game.physics.arcade.accelerationFromRotation(
-      spriteComponent.sprite.rotation,
-      maxSpeed,
-      spriteComponent.sprite.body.acceleration,
-    );
-    spriteComponent.sprite.body.angularVelocity = 0;
     if (!entity.hasComponent("ShipExhaustComponent")) return;
     entity.getComponent("ShipExhaustComponent").emitter.on = true;
   }
@@ -68,7 +56,7 @@ export class NPCMotionSystem extends System {
     // console.log("NPC is fleeing");
     const spriteComponent = entity.getComponent("SpriteComponent");
     const targetSprite =
-      stateComponent.intent.entity.getComponent("SpriteComponent").sprite;
+      stateComponent.decision.entity.getComponent("SpriteComponent").sprite;
     const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
     var angle = game.physics.arcade.angleToXY(
       spriteComponent.sprite,
@@ -82,6 +70,27 @@ export class NPCMotionSystem extends System {
       spriteComponent.sprite.body.acceleration,
     );
     // spriteComponent.sprite.body.velocity.y = 30;
+  }
+
+  MOVETO(entity, stateComponent) {
+    const spriteComponent = entity.getComponent("SpriteComponent");
+    const target = entity.getComponent("TargetComponent")?.target;
+    const targetSprite = target.getComponent("SpriteComponent")?.sprite;
+    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+    moveSpriteByRotation(spriteComponent.sprite, targetSprite);
+    if (!entity.hasComponent("ShipExhaustComponent")) return;
+    entity.getComponent("ShipExhaustComponent").emitter.on = true;
+    // var angle = game.physics.arcade.angleBetween(
+    //   spriteComponent.sprite,
+    //   targetSprite,
+    // );
+    // spriteComponent.sprite.rotation = angle;
+    // game.physics.arcade.accelerationFromRotation(
+    //   spriteComponent.sprite.rotation,
+    //   maxSpeed,
+    //   spriteComponent.sprite.body.acceleration,
+    // );
+    // spriteComponent.sprite.body.angularVelocity = 0;
   }
 
   PATROL(entity) {
@@ -136,7 +145,7 @@ export class NPCMotionSystem extends System {
 
     for (let i = 0; i < len; i++) {
       let component = components[i];
-      let state = component.intent.intent;
+      let state = component.state;
 
       if (this[state]) {
         this[state](this.entities[i], component);

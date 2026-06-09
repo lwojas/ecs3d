@@ -36,6 +36,8 @@ import { TriggerSendComponent } from "../components/tags/TriggerSendComponent.js
 import { PendulumStateComponent } from "../components/PendulumStateComponent.js";
 import { DamageComponent } from "../components/tags/DamageComponent.js";
 import { PatrolComponent } from "../components/PatrolComponent.js";
+import { GoalComponent } from "../components/GoalComponent.js";
+import { TargetComponent } from "../components/TargetComponent.js";
 
 export const componentClasses = {
   InputComponent: InputComponent,
@@ -76,4 +78,6 @@ export const componentClasses = {
   PendulumStateComponent: PendulumStateComponent,
   DamageComponent: DamageComponent,
   PatrolComponent: PatrolComponent,
+  GoalComponent: GoalComponent,
+  TargetComponent: TargetComponent,
 };

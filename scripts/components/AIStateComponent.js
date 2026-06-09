@@ -1,6 +1,9 @@
 export class AIStateComponent {
-  constructor(data) {
+  constructor(entity, data) {
+    this.entity = entity;
     this.defaultState = data.defaultState || "IDLE";
     this.intent;
+    this.target;
+    this.state = this.defaultState;
   }
 }
