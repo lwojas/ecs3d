@@ -69,6 +69,7 @@ export class LightSystem extends System {
       const lightComp = entity.getComponent("LightComponent");
       const sprite = entity.getComponent("SpriteComponent").sprite;
       // console.log(this.entities);
+      if (!sprite?.alive) return;
       if (sprite) lightComp.rotation = sprite.rotation;
       if (isLightInView(lightComp, 50)) {
         this.renderLight(lightComp, this.shadowComps);

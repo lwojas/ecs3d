@@ -14,7 +14,7 @@ export class AIScoringSystem extends System {
   }
 
   startScoring(entity, entityList) {
-    console.log(entityList);
+    // console.log(entityList);
     const targetList = entityList.map((targetEntity) => {
       return { entity: targetEntity, score: scoreEntity(entity, targetEntity) };
     });

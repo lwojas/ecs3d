@@ -82,7 +82,7 @@ export class ProjectileSystem extends System {
   }
 
   projectileImpact(actor, projectile) {
-    console.log(actor, " has been hit");
+    // console.log(actor, " has been hit");
     damageEntity(actor, projectile);
     projectile.kill();
     // actor.kill();

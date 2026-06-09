@@ -17,14 +17,14 @@ export class PerceptionSystem extends System {
       perceptionComponent.entityList = this.factionEntities.filter(
         (factionEntity) =>
           factionEntity.getComponent("FactionComponent").faction !==
-          entity.getComponent("FactionComponent").faction
+          entity.getComponent("FactionComponent").faction,
       );
       perceptionComponent.scanList = this.entityManager.makeSpriteList(
-        perceptionComponent.entityList
+        perceptionComponent.entityList,
       );
     });
     this.perceptionSprites = this.entityManager.makeSpriteList(
-      this.perceptionEntities
+      this.perceptionEntities,
     );
     console.log(this.perceptionEntities);
   }
@@ -40,9 +40,20 @@ export class PerceptionSystem extends System {
       const spriteComponent = entity.getComponent("SpriteComponent");
       const perceptionComponent = entity.getComponent("PerceptionComponent");
       perceptionComponent.visibleEntities = [];
+      let spriteToCheck = null;
+      if (entity.hasComponent("GoalComponent")) {
+        spriteToCheck = entity
+          .getComponent("GoalComponent")
+          .targetId?.getComponent("SpriteComponent")?.sprite;
+      }
 
       perceptionComponent.scanList.forEach((sprite) => {
-        if (spriteComponent.sprite === sprite || !sprite.alive) return;
+        if (
+          spriteComponent.sprite === sprite ||
+          spriteToCheck === sprite ||
+          !sprite.alive
+        )
+          return;
         // console.log(Math.abs(sprite.x - spriteComponent.sprite.x));
         if (
           Math.abs(sprite.x - spriteComponent.sprite.x) <
@@ -65,7 +76,7 @@ export class PerceptionSystem extends System {
       ServiceLocator.resolve("game", "EventSystem").emit(
         "G_PERCEPTION_PULSE",
         entity,
-        perceptionComponent.visibleEntities
+        perceptionComponent.visibleEntities,
       );
     });
   }
