@@ -112,6 +112,8 @@ export const defaultLevel = {
       uniqueId: "trader_test",
       components: {
         Position: { x: 400, y: 500 },
+        InputComponent: "",
+        MotionShipComponent: "",
       },
     },
 

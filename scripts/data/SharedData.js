@@ -65,6 +65,7 @@ export const componentDefaults = {
       currentPatrolAction: "default",
     },
     GoalComponent: {},
+    MovementComponent: { maxSpeed: 75 },
   },
 
   trader: {
@@ -89,6 +90,8 @@ export const componentDefaults = {
     AIStateComponent: {},
     NPCMotionComponent: {},
     CollideComponent: {},
+    MovementComponent: { maxSpeed: 90 },
+    // InputComponent: "",
   },
 
   trigger: {
