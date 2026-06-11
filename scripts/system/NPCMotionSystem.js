@@ -24,15 +24,18 @@ export class NPCMotionSystem extends System {
     // console.log("NPC ATTACK firing");
     const sprite = entity.getComponent("SpriteComponent").sprite;
     const targetSprite =
-      stateComponent.decision.entity.getComponent("SpriteComponent").sprite;
+      entity
+        .getComponent("TargetComponent")
+        ?.target?.getComponent("SpriteComponent")?.sprite || null;
     // console.log(targetSprite.alive);
+    if (!targetSprite) return;
     if (!targetSprite.alive) {
-      stateComponent.state = "PATROL";
+      // stateComponent.state = "PATROL";
       if (stateComponent.decision.entity.hasComponent("PlayerComponent")) {
         game.camera.follow(sprite);
       }
     }
-    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+    const maxSpeed = entity.getComponent("MovementComponent")?.speed || 75;
     moveSpriteByRotation(sprite, targetSprite, maxSpeed);
 
     if (isWithinRange(sprite, targetSprite, 400)) {
@@ -57,8 +60,11 @@ export class NPCMotionSystem extends System {
     // console.log("NPC is fleeing");
     const spriteComponent = entity.getComponent("SpriteComponent");
     const targetSprite =
-      stateComponent.decision.entity.getComponent("SpriteComponent").sprite;
-    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+      entity
+        .getComponent("TargetComponent")
+        ?.target?.getComponent("SpriteComponent")?.sprite || null;
+    if (!targetSprite) return;
+    const maxSpeed = entity.getComponent("MovementComponent")?.speed || 75;
     var angle = game.physics.arcade.angleToXY(
       spriteComponent.sprite,
       game.world.width - targetSprite.x,
@@ -74,11 +80,13 @@ export class NPCMotionSystem extends System {
   }
 
   MOVETO(entity, stateComponent) {
+    // console.log("[Moveto is running]");
     if (!entity.hasComponent("TargetComponent")) return;
+
     const spriteComponent = entity.getComponent("SpriteComponent");
     const target = entity.getComponent("TargetComponent")?.target;
     const targetSprite = target.getComponent("SpriteComponent")?.sprite;
-    const maxSpeed = entity.getComponent("MovementComponent")?.maxSpeed || 75;
+    const maxSpeed = entity.getComponent("MovementComponent")?.speed || 75;
     moveSpriteByRotation(spriteComponent.sprite, targetSprite, maxSpeed);
     if (!entity.hasComponent("ShipExhaustComponent")) return;
     entity.getComponent("ShipExhaustComponent").emitter.on = true;
@@ -116,7 +124,7 @@ export class NPCMotionSystem extends System {
 
     game.physics.arcade.accelerationFromRotation(
       angle,
-      movementComponent?.maxSpeed || 75,
+      movementComponent?.speed || 75,
       sprite.body.acceleration,
     );
   }
@@ -136,12 +144,16 @@ export class NPCMotionSystem extends System {
 
     for (let i = 0; i < len; i++) {
       let component = components[i];
-      let state = component.state;
+      if (!component.entity.hasComponent("InputComponent")) {
+        // if (this.entities[i].hasComponent("InputComponent")) break;
+        let state = component.state;
+        // console.log(state);
 
-      if (this[state]) {
-        this[state](this.entities[i], component);
-      } else {
-        console.log("No state found");
+        if (this[state]) {
+          this[state](this.entities[i], component);
+        } else {
+          console.log("No state found");
+        }
       }
     }
     // this.entities.forEach((entity) => {});

@@ -4,8 +4,8 @@ export function drawDebugLine(
   y1,
   x2,
   y2,
-  color = "#0daff4ff",
-  width = 4
+  color = "#f40d56ff",
+  width = 4,
 ) {
   //   console.log("Drawing debug line");
   ctx.save();
@@ -16,5 +16,25 @@ export function drawDebugLine(
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.stroke();
+  ctx.restore();
+}
+
+export function drawDebugCircle(
+  ctx,
+  x,
+  y,
+  radius,
+  color = "#0daff4ff",
+  width = 4,
+) {
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.arc(x - game.camera.x, y - game.camera.y, radius, 0, Math.PI * 2);
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
+
   ctx.restore();
 }

@@ -22,6 +22,7 @@ export function setAIState(entity) {
 }
 
 function resolveDefaultIntent(stateComp, targetComp) {
+  targetComp.target = stateComp.decision.entity;
   switch (stateComp.decision.intent) {
     case "FLEE":
       stateComp.state = "FLEE";
@@ -35,6 +36,14 @@ function resolveDefaultIntent(stateComp, targetComp) {
 }
 
 function resolveEscortIntent(stateComp, targetComp, goalComp) {
+  // console.log(stateComp);
+  // if (!stateComp.decision) {
+  //   targetComp.target = goalComp.targetId;
+  //   const movementComp = stateComp.entity.getComponent("MovementComponent");
+  //   movementComp.speed = movementComp.maxSpeed;
+  //   stateComp.state = "MOVETO";
+  //   return;
+  // }
   switch (stateComp.decision.intent) {
     case "FLEE":
       // stateComp.state = "FLEE";
@@ -45,19 +54,33 @@ function resolveEscortIntent(stateComp, targetComp, goalComp) {
         goalComp.targetId.getComponent("SpriteComponent")?.sprite;
       const entitySprite =
         stateComp.entity.getComponent("SpriteComponent")?.sprite;
+      targetComp.target = stateComp.decision.entity;
       if (
         escortSprite &&
         entitySprite &&
-        isWithinRange(entitySprite, escortSprite, 400)
+        isWithinRange(entitySprite, escortSprite, 300)
       ) {
         console.log("Attacking target");
+        const movementComp = stateComp.entity.getComponent("MovementComponent");
+        movementComp.speed = 15;
         stateComp.state = "ATTACK";
         break;
       }
       console.log("Moving to escort target");
+
       targetComp.target = goalComp.targetId;
+      const movementComp = stateComp.entity.getComponent("MovementComponent");
+      movementComp.speed = movementComp.maxSpeed;
       stateComp.state = "MOVETO";
       break;
+    case "NO_TARGET":
+      // console.log("[AIState]: no target");
+      targetComp.target = goalComp.targetId;
+      const moveComp = stateComp.entity.getComponent("MovementComponent");
+      moveComp.speed = moveComp.maxSpeed;
+      stateComp.state = "MOVETO";
+      break;
+    // console.log(stateComp.state);
     default:
       stateComp.state = "IDLE";
   }

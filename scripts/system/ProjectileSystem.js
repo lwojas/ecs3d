@@ -1,6 +1,7 @@
 import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
 import { damageEntity } from "./utils/damageEntity.js";
+import { explosionList } from "./utils/explosions.js";
 
 export class ProjectileSystem extends System {
   constructor(entities) {
@@ -84,6 +85,11 @@ export class ProjectileSystem extends System {
   projectileImpact(actor, projectile) {
     // console.log(actor, " has been hit");
     damageEntity(actor, projectile);
+    console.log("[ProjectileSystem] Adding to explosion list");
+    explosionList.push({
+      x: projectile.x,
+      y: projectile.y,
+    });
     projectile.kill();
     // actor.kill();
     // actor.parentEntity.isEnabled = false;

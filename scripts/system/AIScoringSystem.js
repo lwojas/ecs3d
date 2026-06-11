@@ -6,19 +6,43 @@ import { setAIState } from "./utils/AIState.js";
 export class AIScoringSystem extends System {
   constructor() {
     super();
+    this.entities = this.entityManager.registerSystem(this, [
+      "AIStateComponent",
+      "PerceptionComponent",
+    ]);
 
-    ServiceLocator.resolve("game", "EventSystem").on(
-      "G_PERCEPTION_PULSE",
-      this.startScoring.bind(this),
-    );
+    // ServiceLocator.resolve("game", "EventSystem").on(
+    //   "G_PERCEPTION_PULSE",
+    //   this.startScoring.bind(this),
+    // );
+  }
+
+  update() {
+    this.entities.forEach((entity) => {
+      const perceptionComponent = entity.getComponent("PerceptionComponent");
+      this.startScoring(entity, perceptionComponent.visibleEntities);
+    });
   }
 
   startScoring(entity, entityList) {
     // console.log(entityList);
+    if (!entity.hasComponent("AIStateComponent")) return;
+    const targetComp = entity.getComponent("TargetComponent");
+    if (!targetComp) return;
+
+    const stateComp = entity.getComponent("AIStateComponent");
     const targetList = entityList.map((targetEntity) => {
       return { entity: targetEntity, score: scoreEntity(entity, targetEntity) };
     });
-    if (!targetList.length) return;
+    if (!targetList.length) {
+      const intent = { entity: null, intent: "NO_TARGET", score: 0 };
+      stateComp.decision = intent;
+
+      setAIState(entity);
+      // targetComp.target = null;
+
+      return;
+    }
     // console.log(entity.id, targetList);
 
     const fleeScore = targetList.reduce((previous, current) => {
@@ -50,17 +74,16 @@ export class AIScoringSystem extends System {
         }
       },
     );
-    if (!entity.hasComponent("AIStateComponent")) return;
-    const stateComp = entity.getComponent("AIStateComponent");
+    // console.log(suggestedIntent);
+
     const targetSprite = suggestedIntent.entity.getComponent("SpriteComponent");
     stateComp.decision = suggestedIntent;
     stateComp.target = {
       x: targetSprite.sprite.x,
       y: targetSprite.sprite.y,
     };
-    const targetComp = entity.getComponent("TargetComponent");
-    if (!targetComp) return;
-    targetComp.target = suggestedIntent.entity;
+
+    // targetComp.target = suggestedIntent.entity;
     setAIState(entity);
 
     // console.log(entity.id, stateComp.intent.entity);

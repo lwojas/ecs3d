@@ -28,6 +28,8 @@ import { TapInputSystem } from "./system/TapInputSystem.js";
 import { pendulumLevel } from "./data/pendulumLevel.js";
 import { KillSystem } from "./system/KillSystem.js";
 import { GoalSystem } from "./system/GoalSystem.js";
+import { createExplosion } from "./system/utils/explosionShip.js";
+import { ExplosionSystem } from "./system/ExplosionSystem.js";
 
 export class Whiteroom {
   create() {
@@ -94,6 +96,7 @@ export class Whiteroom {
     this.collisionSystem = new CollideSystem();
     this.goalSystem = new GoalSystem(this.entities);
     this.killSystem = new KillSystem();
+    this.explosionSystem = new ExplosionSystem();
     // Testing only
     BasicGame.entities = this.entities;
     BasicGame.SpriteComponent = SpriteComponent;
@@ -103,7 +106,9 @@ export class Whiteroom {
     // entities[0].addComponent(
     //   new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
     // );
+
     this.lightSystem = new LightSystem();
+    // createExplosion();
 
     registerEvents();
   }
@@ -117,10 +122,12 @@ export class Whiteroom {
     this.trackerSystem.update();
     this.weaponSystem.update();
     this.perceptionSystem.update();
+    this.AIscoringSystem.update();
     this.NPCMovementSystem.update();
     this.projectileSystem.update();
     this.killSystem.update();
     this.lightSystem.update();
+    this.explosionSystem.update();
     this.collisionSystem.update();
   }
 

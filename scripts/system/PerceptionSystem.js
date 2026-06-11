@@ -1,10 +1,13 @@
 import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
+import { drawDebugCircle } from "./utils/debugTools.js";
 
 export class PerceptionSystem extends System {
   constructor() {
     super();
     this.cooldown = 2000;
+    this.debugSystem = ServiceLocator.resolve("game", "DebugSystem");
+
     // this._scanTimer = 0;
     this.perceptionEntities = this.entityManager.registerSystem(this, [
       "PerceptionComponent",
@@ -38,15 +41,22 @@ export class PerceptionSystem extends System {
 
     this.perceptionEntities.forEach((entity) => {
       const spriteComponent = entity.getComponent("SpriteComponent");
+      // if (!spriteComponent.sprite.alive) return;
       const perceptionComponent = entity.getComponent("PerceptionComponent");
       perceptionComponent.visibleEntities = [];
+      const foundEntities = [];
       let spriteToCheck = null;
       if (entity.hasComponent("GoalComponent")) {
         spriteToCheck = entity
           .getComponent("GoalComponent")
           .targetId?.getComponent("SpriteComponent")?.sprite;
       }
-
+      drawDebugCircle(
+        this.debugSystem.debugData.ctx,
+        spriteComponent.sprite.x,
+        spriteComponent.sprite.y,
+        perceptionComponent.detectionRadius,
+      );
       perceptionComponent.scanList.forEach((sprite) => {
         if (
           spriteComponent.sprite === sprite ||
@@ -54,30 +64,23 @@ export class PerceptionSystem extends System {
           !sprite.alive
         )
           return;
-        // console.log(Math.abs(sprite.x - spriteComponent.sprite.x));
         if (
           Math.abs(sprite.x - spriteComponent.sprite.x) <
             perceptionComponent.detectionRadius &&
           Math.abs(sprite.y - spriteComponent.sprite.y) <
             perceptionComponent.detectionRadius
         ) {
-          perceptionComponent.visibleEntities.push(sprite.parentEntity);
-          //   console.log(this._scanTimer);
-          //  Do stuff if sprite is in range
-          //   console.log(
-          //     entity.id,
-          //     "has detected the following entity: ",
-          //     sprite.parentEntity.id
-          //   );
+          drawDebugCircle(
+            this.debugSystem.debugData.ctx,
+            sprite.x,
+            sprite.y,
+            30,
+          );
+          foundEntities.push(sprite.parentEntity);
         }
       });
-      // console.log(perceptionComponent.visibleEntities);
-      // this.sendUpdate(perceptionComponent.visibleEntities);
-      ServiceLocator.resolve("game", "EventSystem").emit(
-        "G_PERCEPTION_PULSE",
-        entity,
-        perceptionComponent.visibleEntities,
-      );
+
+      perceptionComponent.visibleEntities = foundEntities;
     });
   }
 }
