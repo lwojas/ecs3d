@@ -1,5 +1,6 @@
 import { System } from "./System.js";
 import { ServiceLocator } from "../services/ServiceLocator.js";
+import { controlResolver } from "./utils/controlResolver.js";
 
 export class InputSystem extends System {
   constructor(listener) {
@@ -20,30 +21,30 @@ export class InputSystem extends System {
 
     // On key down
     this.keybMap.right.onDown.add(() => {
-      this.sendUpdate("right");
+      this.updateInputState("right");
     });
     this.keybMap.left.onDown.add(() => {
-      this.sendUpdate("left");
+      this.updateInputState("left");
     });
     this.keybMap.up.onDown.add(() => {
-      this.sendUpdate("up");
+      this.updateInputState("up");
     });
     this.keybMap.down.onDown.add(() => {
-      this.sendUpdate("down");
+      this.updateInputState("down");
     });
 
     // On key up
     this.keybMap.left.onUp.add(() => {
-      this.sendUpdate("leftOff");
+      this.updateInputState("leftOff");
     });
     this.keybMap.right.onUp.add(() => {
-      this.sendUpdate("rightOff");
+      this.updateInputState("rightOff");
     });
     this.keybMap.down.onUp.add(() => {
-      this.sendUpdate("downOff");
+      this.updateInputState("downOff");
     });
     this.keybMap.up.onUp.add(() => {
-      this.sendUpdate("upOff");
+      this.updateInputState("upOff");
     });
 
     this.keybMap.space.onDown.add(() => {
@@ -70,6 +71,12 @@ export class InputSystem extends System {
     // BasicGame.downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
     // BasicGame.leftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
     // BasicGame.rightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+  }
+
+  updateInputState(command) {
+    this.entities.forEach((entity) => {
+      controlResolver(entity, command);
+    });
   }
 
   update() {

@@ -21,6 +21,12 @@ export function setAIState(entity) {
   }
 }
 
+function resolveState(stateComp) {
+  const controlComp = stateComp.entity.getComponent("ControlIntentComponent");
+  if (!controlComp) return;
+  controlComp.state = stateComp.state;
+}
+
 function resolveDefaultIntent(stateComp, targetComp) {
   targetComp.target = stateComp.decision.entity;
   switch (stateComp.decision.intent) {
@@ -33,6 +39,7 @@ function resolveDefaultIntent(stateComp, targetComp) {
     default:
       stateComp.state = "IDLE";
   }
+  resolveState(stateComp);
 }
 
 function resolveEscortIntent(stateComp, targetComp, goalComp) {
@@ -84,4 +91,5 @@ function resolveEscortIntent(stateComp, targetComp, goalComp) {
     default:
       stateComp.state = "IDLE";
   }
+  resolveState(stateComp);
 }

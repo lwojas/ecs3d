@@ -123,7 +123,7 @@ export class Whiteroom {
     this.weaponSystem.update();
     this.perceptionSystem.update();
     this.AIscoringSystem.update();
-    this.NPCMovementSystem.update();
+    // this.NPCMovementSystem.update();
     this.projectileSystem.update();
     this.killSystem.update();
     this.lightSystem.update();
