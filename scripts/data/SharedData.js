@@ -29,6 +29,7 @@ export const componentDefaults = {
     },
     CollideComponent: {},
     TriggerSendComponent: {},
+    ControlIntentComponent: {},
   },
 
   pirate: {
@@ -52,6 +53,7 @@ export const componentDefaults = {
         { type: "canon", amount: 1000, props: { power: 100, speed: 300 } },
       ],
     },
+    ControlIntentComponent: {},
     InventoryComponent: {},
     WeaponControllerComponent: {},
     EmotionComponent: { aggression: 50 },
@@ -71,6 +73,7 @@ export const componentDefaults = {
   trader: {
     SpriteComponent: { spriteKey: "Cobra" },
     PhysicsDynamicComponent: {},
+    ControlIntentComponent: {},
     ShipExhaustComponent: { spriteKey: "pixelWhite" },
     TargetComponent: {},
     PerceptionComponent: {},

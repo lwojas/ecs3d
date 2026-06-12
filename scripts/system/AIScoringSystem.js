@@ -2,6 +2,7 @@ import { ServiceLocator } from "../services/ServiceLocator.js";
 import { System } from "./System.js";
 import { scoreEntity } from "./utils/AIScoring.js";
 import { setAIState } from "./utils/AIState.js";
+import { controlResolver } from "./utils/controlResolver.js";
 
 export class AIScoringSystem extends System {
   constructor() {
@@ -37,8 +38,8 @@ export class AIScoringSystem extends System {
     if (!targetList.length) {
       const intent = { entity: null, intent: "NO_TARGET", score: 0 };
       stateComp.decision = intent;
-
-      setAIState(entity);
+      controlResolver(entity);
+      // setAIState(entity);
       // targetComp.target = null;
 
       return;
@@ -84,7 +85,8 @@ export class AIScoringSystem extends System {
     };
 
     // targetComp.target = suggestedIntent.entity;
-    setAIState(entity);
+    // setAIState(entity);
+    controlResolver(entity);
 
     // console.log(entity.id, stateComp.intent.entity);
     // console.log(suggestedIntent);

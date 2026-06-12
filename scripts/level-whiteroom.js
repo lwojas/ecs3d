@@ -91,8 +91,7 @@ export class Whiteroom {
     this.trackerSystem = new TrackerSystem();
     this.perceptionSystem = new PerceptionSystem();
     this.AIscoringSystem = new AIScoringSystem();
-    this.NPCMovementSystem = new NPCMotionSystem();
-    // this.perceptionSystem.addSystemListener(this.AIscoringSystem);
+
     this.collisionSystem = new CollideSystem();
     this.goalSystem = new GoalSystem(this.entities);
     this.killSystem = new KillSystem();
@@ -123,7 +122,7 @@ export class Whiteroom {
     this.weaponSystem.update();
     this.perceptionSystem.update();
     this.AIscoringSystem.update();
-    this.NPCMovementSystem.update();
+    // this.NPCMovementSystem.update();
     this.projectileSystem.update();
     this.killSystem.update();
     this.lightSystem.update();
