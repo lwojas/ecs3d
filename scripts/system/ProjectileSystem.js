@@ -89,6 +89,7 @@ export class ProjectileSystem extends System {
     explosionList.push({
       x: projectile.x,
       y: projectile.y,
+      startTime: game.time.now,
     });
     projectile.kill();
     // actor.kill();

@@ -32,8 +32,8 @@ export class PerceptionSystem extends System {
     console.log(this.perceptionEntities);
   }
 
-  update() {
-    const delta = game.time.now;
+  update(delta) {
+    // const delta = game.time.now;
     this._scanTimer = this._scanTimer || 0;
     if (delta < this._scanTimer) return;
     // console.log("Pulse");
@@ -51,12 +51,12 @@ export class PerceptionSystem extends System {
           .getComponent("GoalComponent")
           .targetId?.getComponent("SpriteComponent")?.sprite;
       }
-      drawDebugCircle(
-        this.debugSystem.debugData.ctx,
-        spriteComponent.sprite.x,
-        spriteComponent.sprite.y,
-        perceptionComponent.detectionRadius,
-      );
+      // drawDebugCircle(
+      //   this.debugSystem.debugData.ctx,
+      //   spriteComponent.sprite.x,
+      //   spriteComponent.sprite.y,
+      //   perceptionComponent.detectionRadius,
+      // );
       perceptionComponent.scanList.forEach((sprite) => {
         if (
           spriteComponent.sprite === sprite ||

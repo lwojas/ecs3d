@@ -94,14 +94,14 @@ export const defaultLevel = {
       uniqueId: "pirate_test",
       components: {
         Position: { x: 300, y: 300 },
-        LightComponent: {
-          sprites: [
-            // { scale: 4, sprite: "defaultLight" },
-            { scale: 1, sprite: "lightShip" },
-          ],
-          castShadows: true,
-          isSpot: true,
-        },
+        // LightComponent: {
+        //   sprites: [
+        //     // { scale: 4, sprite: "defaultLight" },
+        //     { scale: 1, sprite: "lightShip" },
+        //   ],
+        //   castShadows: true,
+        //   isSpot: true,
+        // },
         TriggerSendComponent: {},
         GoalComponent: { type: "escort_player" },
       },

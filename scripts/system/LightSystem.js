@@ -1,6 +1,10 @@
 import { System } from "./System.js";
+import { explosionList } from "./utils/explosions.js";
 import { isLightInView } from "./utils/isLightInView.js";
 import { spriteLayers } from "./utils/spriteLayers.js";
+
+const EXPLOSION_LIGHT_DURATION = 1000; // ms
+const EXPLOSION_LIGHT_RADIUS = 350;
 
 export class LightSystem extends System {
   constructor() {
@@ -57,7 +61,12 @@ export class LightSystem extends System {
     });
   }
 
-  update() {
+  createParticleLights() {
+    this.particleLights = [];
+    // for ()
+  }
+
+  update(delta) {
     this.bitmapDataMask.fill(
       this.ambientLight.r,
       this.ambientLight.g,
@@ -65,7 +74,9 @@ export class LightSystem extends System {
       this.ambientLight.a,
     );
     // console.log(this.entities);
-    this.entities.forEach((entity) => {
+    const len = this.entities.length;
+    for (let i = 0; i < len; i++) {
+      const entity = this.entities[i];
       const lightComp = entity.getComponent("LightComponent");
       const sprite = entity.getComponent("SpriteComponent").sprite;
       // console.log(this.entities);
@@ -74,9 +85,39 @@ export class LightSystem extends System {
       if (isLightInView(lightComp, 50)) {
         this.renderLight(lightComp, this.shadowComps);
       }
-    });
-
+    }
+    this.renderExplosionLights(delta);
     // this.drawDebugShadowPolygons();
+  }
+
+  renderExplosionLights(delta) {
+    const now = delta;
+
+    for (const explosion of explosionList) {
+      const age = now - explosion.startTime;
+      if (age > EXPLOSION_LIGHT_DURATION) continue;
+      const t = age / EXPLOSION_LIGHT_DURATION;
+      this.renderExplosionLight(explosion.x, explosion.y, t);
+    }
+  }
+
+  renderExplosionLight(x, y, t) {
+    const radius = 50 + EXPLOSION_LIGHT_RADIUS * t;
+    const intensity = 1 - t;
+
+    const lightComp = {
+      position: { x, y },
+      radius,
+      color: {
+        r: 255,
+        g: 255,
+        b: 255,
+      },
+      intensity,
+      isSpot: false,
+    };
+
+    this.renderLight(lightComp, this.shadowComps);
   }
 
   renderLight(lightComp, occluders) {
