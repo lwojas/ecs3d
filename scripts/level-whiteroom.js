@@ -113,6 +113,7 @@ export class Whiteroom {
   }
 
   update() {
+    const delta = game.time.now;
     this.debugSystem.update();
     this.inputSystem.update();
     this.movementSystem.update();
@@ -120,12 +121,12 @@ export class Whiteroom {
     this.triggerSystem.update();
     this.trackerSystem.update();
     this.weaponSystem.update();
-    this.perceptionSystem.update();
+    this.perceptionSystem.update(delta);
     this.AIscoringSystem.update();
     // this.NPCMovementSystem.update();
     this.projectileSystem.update();
     this.killSystem.update();
-    this.lightSystem.update();
+    this.lightSystem.update(delta);
     this.explosionSystem.update();
     this.collisionSystem.update();
   }
