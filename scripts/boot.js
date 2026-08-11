@@ -16,7 +16,7 @@ BasicGame.Boot.prototype = {
       "defaultObject",
       "assets/_default_object.png",
       16,
-      16
+      16,
     );
     this.load.spritesheet("defaultPawn", "assets/_default_pawn.png", 16, 16);
     this.load.image("pixelWhite", "assets/_pixel_white.png");
@@ -33,10 +33,10 @@ BasicGame.Boot.prototype = {
   create: function () {
     game.stage.backgroundColor = "#999";
     this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL; // Scale the canvas to fit the whole window
-    this.world.setBounds(0, 0, 2000, 2000); // Set the size of the game world - this is not the size of the camera
+    // this.world.setBounds(0, 0, 2000, 2000); // Set the size of the game world - this is not the size of the camera
     this.time.advancedTiming = true;
-    this.physics.startSystem(Phaser.Physics.ARCADE);
-    game.camera.roundPx = false; // stops the sprite from jittering.
+    // this.physics.startSystem(Phaser.Physics.ARCADE);
+    // game.camera.roundPx = false; // stops the sprite from jittering.
     // game.camera.lerp = 0.5;
 
     game.state.start("Whiteroom"); // Load the first level

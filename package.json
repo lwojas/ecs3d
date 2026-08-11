@@ -1,10 +1,12 @@
 {
   "name": "ecs_demo",
   "version": "1.0.0",
+  "type": "module",
   "description": "ECS game engine",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:raycaster": "node tests/raycaster-geometry.test.mjs",
     "start": "lite-server"
   },
   "author": "",

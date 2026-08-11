@@ -1,145 +1,145 @@
-import { InputSystem } from "./system/InputSystem.js";
-import { ServiceLocator } from "./services/ServiceLocator.js";
-import { EntityManager } from "./services/EntityManager.js";
-import { OverlapSystem } from "./system/OverlapSystem.js";
-import { PrefabFactory } from "./services/PrefabFactory.js";
-import { componentDefaults } from "./data/SharedData.js";
-import { defaultLevel } from "./data/DefaultLevel.js";
-import { TriggerSystem } from "./system/TriggerSystem.js";
-import { MotionSystemShip } from "./system/MotionSystemShip.js";
-import { TrackerSystem } from "./system/TrackerSystem.js";
-import { SpriteComponent } from "./components/SpriteComponent.js";
-import { EventBus } from "./services/EventBus.js";
-import { WeaponSystem } from "./system/WeaponSystem.js";
-import { CameraSystem } from "./system/CameraSystem.js";
-import { InventorySystem } from "./system/InventorySystem.js";
-import { ProjectileSystem } from "./system/ProjectileSystem.js";
-import { AmmoSystem } from "./system/AmmoSystem.js";
-import { registerEvents } from "./services/Events.js";
-import { initialiseSpriteLayers } from "./system/utils/spriteLayers.js";
-import { LightSystem } from "./system/LightSystem.js";
-import { PerceptionSystem } from "./system/PerceptionSystem.js";
-import { AIScoringSystem } from "./system/AIScoringSystem.js";
-import { CollideSystem } from "./system/CollideSystem.js";
-import { NPCMotionSystem } from "./system/NPCMotionSystem.js";
-import { DebugSystem } from "./system/DebugSystem.js";
-import { PendulumSystem } from "./system/PendulumSystem.js";
-import { TapInputSystem } from "./system/TapInputSystem.js";
-import { pendulumLevel } from "./data/pendulumLevel.js";
-import { KillSystem } from "./system/KillSystem.js";
-import { GoalSystem } from "./system/GoalSystem.js";
-import { createExplosion } from "./system/utils/explosionShip.js";
-import { ExplosionSystem } from "./system/ExplosionSystem.js";
+import { Raycaster } from "./system/Raycaster.js";
+import { testLevel } from "./data/3dtestLevel.js";
 
 export class Whiteroom {
+  preload() {
+    this.load.image("wallTexture", "assets/textures/wall.png");
+
+    this.load.image("floorTexture", "assets/textures/floor.png");
+
+    this.load.image("ceilingTexture", "assets/textures/ceiling.png");
+
+    this.load.image("brickTexture", "assets/textures/brick.png");
+  }
+
   create() {
-    this.entities = [];
-    initialiseSpriteLayers();
-    BasicGame.entities = this.entities;
-    this.movementSystem;
-    this.inputSystem;
-    this.overlapSystem;
-    this.triggerSystem;
-    this.trackerSystem;
-    console.log("White level loaded");
-    BasicGame.service = ServiceLocator;
+    this.raycaster = new Raycaster(this.game, testLevel, {
+      width: 320,
+      height: 180,
+      debugSpriteAnchors: true,
+      cellSize: 4,
 
-    this.debugSystem = new DebugSystem();
+      wallHeight: 16,
+      cameraHeight: 4,
 
-    // Automatically registers to ServiceLocator - needs domain ("system", "game")
-    this.eventSystemGame = new EventBus("game");
+      fov: Math.PI / 3,
 
-    // All systems can reach the entity manager via Service locator
-    this.entityManager = new EntityManager();
+      maxDistance: 1000,
+    });
 
-    // Generate entities from Json
-    const prefabFactory = new PrefabFactory(
-      this.entityManager,
-      componentDefaults,
-      defaultLevel,
-      // pendulumLevel,
-    );
-    this.entities = prefabFactory.loadLevel();
+    this.raycaster.resizeToCamera();
 
-    // Create and assign systems
+    this.player = {
+      x: 14,
+      y: 14,
 
-    // this.overlapSystem = new OverlapSystem(
-    //   ["OverlapComponent"],
-    //   ["PlayerComponent"]
-    // );
+      angle: 0,
 
-    // Tidy up
-    this.movementSystem = new MotionSystemShip();
-    this.inputSystem = new InputSystem(this.movementSystem);
-    this.triggerSystem = new TriggerSystem(
-      ["TriggerComponent"],
-      ["TriggerSendComponent"],
-    );
-    this.inputSystem.addSystemListener(this.triggerSystem);
+      speed: 8,
+    };
 
-    this.inventorySystem = new InventorySystem();
-    this.cameraSystem = new CameraSystem(this.entities);
-    this.weaponSystem = new WeaponSystem();
-    this.tapInputSystem = new TapInputSystem();
-    this.inputSystem.addSystemListener(this.weaponSystem);
-    this.pendulumSystem = new PendulumSystem();
+    // Renderer-facing billboard data. This is deliberately plain data rather
+    // than a Phaser sprite or ECS entity.
+    this.testSprites = [
+      {
+        x: 28,
+        y: 12,
+        z: 0,
+        width: 1,
+        height: 1,
+        scale: 16,
+        texture: "Cobra",
+      },
+    ];
 
-    this.projectileSystem = new ProjectileSystem(this.entities);
-    this.weaponSystem.addSystemListener(this.projectileSystem);
-    this.ammoSystem = new AmmoSystem(this.entities);
+    // Renderer-facing lighting data (P8-02). Just as with sprites, this is
+    // plain per-frame data the Raycaster only turns into pixel brightness --
+    // it owns no light lifecycle. Stands in for a future ECS LightSystem.
+    this.testLights = [
+      {
+        x: 28,
+        y: 20,
+        z: 3,
+        radius: 20,
+        intensity: 1.5,
+        tint: { r: 255, g: 180, b: 120 },
+      },
+    ];
+    this.ambient = 0.35;
 
-    this.trackerSystem = new TrackerSystem();
-    this.perceptionSystem = new PerceptionSystem();
-    this.AIscoringSystem = new AIScoringSystem();
+    this.keys = this.game.input.keyboard.addKeys({
+      forward: Phaser.Keyboard.W,
 
-    this.collisionSystem = new CollideSystem();
-    this.goalSystem = new GoalSystem(this.entities);
-    this.killSystem = new KillSystem();
-    this.explosionSystem = new ExplosionSystem();
-    // Testing only
-    BasicGame.entities = this.entities;
-    BasicGame.SpriteComponent = SpriteComponent;
-    // this.inventorySystem.addItem(this.entities[3], this.entities[0]);
-    // this.weaponSystem.equipWeapon(this.entities[3], this.entities[0]);
+      backward: Phaser.Keyboard.S,
 
-    // entities[0].addComponent(
-    //   new SpriteComponent(entities[0], { spriteKey: "defaultObject" })
-    // );
+      left: Phaser.Keyboard.A,
 
-    this.lightSystem = new LightSystem();
-    // createExplosion();
-
-    registerEvents();
+      right: Phaser.Keyboard.D,
+    });
   }
 
   update() {
-    const delta = game.time.now;
-    this.debugSystem.update();
-    this.inputSystem.update();
-    this.movementSystem.update();
-    this.pendulumSystem.update();
-    this.triggerSystem.update();
-    this.trackerSystem.update();
-    this.weaponSystem.update();
-    this.perceptionSystem.update(delta);
-    this.AIscoringSystem.update();
-    // this.NPCMovementSystem.update();
-    this.projectileSystem.update();
-    this.killSystem.update();
-    this.lightSystem.update(delta);
-    this.explosionSystem.update();
-    this.collisionSystem.update();
-  }
+    const dt = this.game.time.elapsed / 1000;
 
-  preRender() {}
+    const player = this.player;
 
-  render() {
-    // game.time.advancedTiming = true;
-    // game.debug.text(game.time.fps, 20, 14, "#00ff00");
+    if (this.keys.left.isDown) {
+      player.angle -= 2.5 * dt;
+    }
+
+    if (this.keys.right.isDown) {
+      player.angle += 2.5 * dt;
+    }
+
+    let moveX = 0;
+    let moveY = 0;
+
+    if (this.keys.forward.isDown) {
+      moveX += Math.cos(player.angle);
+
+      moveY += Math.sin(player.angle);
+    }
+
+    if (this.keys.backward.isDown) {
+      moveX -= Math.cos(player.angle);
+
+      moveY -= Math.sin(player.angle);
+    }
+
+    const length = Math.sqrt(moveX * moveX + moveY * moveY);
+
+    if (length > 0) {
+      moveX /= length;
+      moveY /= length;
+
+      const distance = player.speed * dt;
+
+      const nextX = player.x + moveX * distance;
+
+      const nextY = player.y + moveY * distance;
+
+      if (!this.raycaster.isWallWorld(nextX, player.y)) {
+        player.x = nextX;
+      }
+
+      if (!this.raycaster.isWallWorld(player.x, nextY)) {
+        player.y = nextY;
+      }
+    }
+
+    player.z = this.raycaster.getEyeHeightWorld(player.x, player.y);
+
+    const camera = this.raycaster.createCameraSnapshot(player);
+    camera.sprites = this.testSprites;
+    camera.lights = this.testLights;
+    camera.ambient = this.ambient;
+    this.raycaster.renderSnapshot(camera);
   }
 
   shutdown() {
-    this.inventorySystem.shutdown(this.entities);
-    ServiceLocator.shutDown();
+    if (this.raycaster) {
+      this.raycaster.destroy();
+      this.raycaster = null;
+    }
   }
 }
