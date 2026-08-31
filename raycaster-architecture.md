@@ -43,9 +43,19 @@ load-bearing; see [Section 4](#4-where-its-safe-to-extend-this).
    `focalLength`/`columnGeometry` if it changed), `renderCameraHeight`
    (from `camera.z`), and `renderHorizon` (from `camera.pitch`), plus the
    cached `planeRowFactors` for floor/ceiling math.
-2. **Reset the frame** — blit the pre-rendered sky (`backgroundPixels`,
-   filled once at construction) over the whole pixel buffer, reset the
-   per-column/per-pixel depth buffers (`columnDepth`, `pixelDepth`).
+2. **Reset the frame and draw the sky** — clear the pixel buffer, then
+   fill rows `[0, skyRows)` (`skyRows` = the *current* `renderHorizon`,
+   clamped to the screen — recomputed every frame, not a static
+   precomputed buffer, specifically so it tracks pitch correctly all the
+   way to the edges of the screen) with either `fillFlatSky()` (no
+   `level.sky`: the flat background colour) or `renderSky()` (a
+   `level.sky` texture: horizontal position from `camera.angle` only,
+   vertical position stretched to fit the current sky region — see
+   `raycaster-api.md`'s Sky section). Then reset the per-column/per-pixel
+   depth buffers (`columnDepth`, `pixelDepth`). The sky is a background
+   layer only: it doesn't touch cell data, collision, or either depth
+   buffer, and anything drawn afterward (walls, planes, sprites) simply
+   overwrites it wherever it exists.
 3. **Resolve lighting** — `resolveLights(camera.lights)` normalizes the
    raw per-frame light list once (drops dead lights, precomputes
    `radiusSquared`, normalizes `tint`); bundled with `camera.ambient`
@@ -63,10 +73,22 @@ load-bearing; see [Section 4](#4-where-its-safe-to-extend-this).
      (`segmentScratch`) to avoid per-frame allocation.
    - **`renderColumn(...)`** walks those segments front-to-back and, for
      each one:
-     - If the cell has a `wall`, computes the fisheye-corrected distance
-       (`getCorrectedDistance`) and calls **`drawWall`**, which draws
-       the vertical strip of texture for that column and updates
-       `pixelDepth` (used later for sprite occlusion).
+     - If the cell has any `sections` (an ordinary full-height wall is
+       just a one-entry `sections` list — see `normaliseCellDefinition()`
+       and [Section 4](#4-where-its-safe-to-extend-this)), computes the
+       fisheye-corrected distance (`getCorrectedDistance`) once, then
+       calls **`drawWallSection`** once per section, which draws that
+       section's own vertical strip of texture for that column and
+       updates `pixelDepth` (used later for sprite occlusion), then
+       **`drawSectionCaps`**, which draws the section's horizontal top
+       and/or bottom face wherever there's actually open space adjacent
+       to it (a sill's visible top, a lintel's visible underside) by
+       calling `renderPlane` again — a cap is just a floor/ceiling-shaped
+       plane scoped to one section's height, so no new geometry code was
+       needed for it. A gap between sections (or above/below all of
+       them) simply isn't subtracted from the visibility interval, so
+       whatever's behind the boundary — this same cell's own floor/
+       ceiling, or a further segment — remains free to render into it.
      - Calls **`renderPlane`** twice (floor, then ceiling), which draws
        whatever rows of that column fall within the cell's visible
        vertical span.
@@ -98,8 +120,14 @@ things they draw are different shapes.
 
 - **Cells, not entities.** The level is a 2D grid; each grid cell has a
   numeric/string id, and each distinct id maps to one cell *definition*
-  (floor/ceiling height, wall/floor/ceiling surfaces, `blocking`,
+  (floor/ceiling height, `sections`/floor/ceiling surfaces, `blocking`,
   `fog`). Many map positions typically share one cell definition.
+- **A boundary is a list of sections, not one solid span.** `sections`
+  (an array of independent `{bottom, top, material}` vertical bands) is
+  the authoritative wall representation; `wall` is sugar for a one-entry
+  `sections` list spanning the whole cell. This is what makes windows,
+  arches, railings, and overhangs possible without a second geometry
+  system — see [Section 4](#4-where-its-safe-to-extend-this).
 - **Corrected vs. raw distance.** `entryDistance`/`exitDistance` on a
   segment are raw ray-travel distances. Anywhere you see "distance" used
   for *projection* (wall height, plane row, fog, light falloff), it's
@@ -130,26 +158,115 @@ things they draw are different shapes.
 - **The `render(player)` legacy wrapper** exists purely so old call
   sites keep working; new code should call `createCameraSnapshot` +
   `renderSnapshot` directly to attach `sprites`/`lights`/`ambient`.
+- **Geometry queries are a separate surface from rendering.**
+  `castRay()` and `checkVisibility()` reuse the same DDA primitives
+  (`createRay`/`stepRay`) as `traceRay()`, but never touch projection,
+  texture sampling, or the pixel buffer — they don't call
+  `renderSnapshot`/`renderColumn` at all. `checkVisibility()` in
+  particular exists so AI/gameplay line-of-sight checks don't need to
+  render a frame to answer "can A see B" — see `raycaster-api.md`.
+- **Nothing about a loaded cell is cached or snapshotted after
+  `loadCells()`.** Every read path (`isWallWorld`, `getStandingHeight`,
+  `renderColumn`, `checkVisibility`) calls `getCell()`/reads
+  `this.cells[id]` fresh, every time. This is what makes
+  `setCellSections()`/`setCellBlocking()` (runtime door/switch support)
+  possible without any extra plumbing: mutating a cell object in place is
+  visible everywhere immediately, because nowhere held onto an
+  already-computed answer from an earlier frame.
 
 ## 4. Where it's safe to extend this
 
-The renderer has grown three features (steps/`blocking`, lighting, fog)
-on top of its original wall/floor/ceiling core, each following the same
-few extension shapes. New features should almost always fit into one of
-these:
+The renderer has grown four features (`sections`, steps/`blocking`,
+lighting, fog) on top of its original wall/floor/ceiling core, each
+following the same few extension shapes. New features should almost
+always fit into one of these:
 
 ### Adding a new per-cell property (like `blocking`, `fog`)
 
 1. Resolve/default it in **`normaliseCellDefinition()`** — default it to
    whatever preserves *today's* behavior for every existing level (see
-   how `blocking` defaults to `!!wall`, and `fog` defaults to `null`).
+   how `blocking` defaults to `sections.length > 0`, and `fog` defaults
+   to `null`).
 2. Carry it through in **`loadCells()`** onto the loaded cell object.
-3. Read it wherever it's needed (`drawWall`, `renderPlane`,
+3. Read it wherever it's needed (`drawWallSection`, `renderPlane`,
    `isWall`, etc.) — don't add a second, parallel place that also knows
    about cell configuration.
 
 This is intentionally cheap: normalization happens once at load time,
 not per frame, so there's no hot-path cost to worry about.
+
+If the property should also be **mutable at runtime** (like
+`sections`/`blocking` via `setCellSections()`/`setCellBlocking()`), add a
+setter that:
+
+1. Looks the cell up by **id** (`this.cells[String(id)]`), not by an
+   `(x, y)` position — a position resolves to a shared cell object, and
+   a setter that took a position would obscure that sharing instead of
+   making it explicit.
+2. Re-normalizes the input the same way `normaliseCellDefinition()`
+   would (same defaults, same `loadSurface()` calls for any raw
+   materials) — don't require the caller to hand-build the already-
+   loaded shape themselves.
+3. Mutates the cell object **in place** rather than replacing
+   `this.cells[id]` with a new object — nothing needs to be told the
+   reference changed, because nothing holds a stale reference to begin
+   with (see the "nothing about a loaded cell is cached" key concept
+   above).
+4. Warns and returns `null` for an unknown id rather than throwing,
+   matching `loadSurface()`'s existing "missing texture" convention.
+
+### Adding partial/multi-band wall geometry (like `sections`)
+
+This is really a specific case of the pattern above, but it's the
+biggest structural addition so far and worth spelling out. `sections` on
+a cell — `[{bottom, top, material}, ...]` — replaced "one wall spans the
+whole cell" with "one boundary is a list of independent vertical bands."
+The key decisions that made this a narrow, additive change rather than a
+rewrite:
+
+- **`wall` still exists** and is normalized into a one-entry `sections`
+  list (`normaliseCellDefinition()`), so every existing level and every
+  hand-built test fixture that never learns about `sections` keeps
+  working unmodified.
+- **The renderer loops over `sections`** in `renderColumn()`'s
+  wall-handling block instead of branching on a single `cell.wall`, and
+  `drawWallSection()` reads `section.bottom/top/material` instead of
+  `segment.cell.floorHeight/ceilingHeight/wall`. For the one-section
+  (ordinary wall) case this is *exactly* the same number of operations
+  as before — no cost was added for levels that don't use multiple
+  sections.
+- **Gaps need no new mechanism.** An open band between (or above/below)
+  sections just isn't subtracted from the column's visibility interval,
+  so the existing interval system already lets whatever's behind the
+  boundary show through — this is the same mechanism that already let a
+  short wall/step leave open space above it.
+- **No collision/gameplay interpretation was added.** `sections` is
+  exposed via `getCell()` for a collision system to read and interpret
+  itself (see `raycaster-api.md`'s `getStandingHeight()` and `getCell()`
+  entries); the Raycaster only decides how sections affect pixels, never
+  whether an entity can pass through a gap.
+- **A section's own vertical face isn't the whole picture — its cap
+  faces are a `renderPlane` call, not new geometry.** The first version
+  of `sections` only drew each section's vertical face, leaving no
+  horizontal surface where a section ends before the cell's own floor/
+  ceiling does — a window's sill had no visible top, its lintel no
+  visible underside. `drawSectionCaps()` fixed this by drawing a
+  `renderPlane` plane at `section.top`/`section.bottom` whenever the
+  neighbouring section (or the cell's floor/ceiling, for the outermost
+  section) leaves a gap there — reusing the exact same plane renderer
+  floors/ceilings already use, just scoped to one section's height and
+  this segment's distance range, rather than inventing a new kind of
+  surface. `sections` is kept sorted by `bottom` (`normaliseCellDefinition()`)
+  specifically so a section's neighbours — and therefore whether it needs
+  a cap — are just `sections[i - 1]`/`sections[i + 1]`. An ordinary
+  full-height wall (one section, whose own bottom/top already equal the
+  cell's floor/ceiling) draws zero caps, so this cost nothing for the
+  common case.
+
+If you add another structural cell property, look for this same shape:
+can the old field be normalized into the new representation instead of
+living alongside it forever, and does the hot loop only pay for what a
+level actually uses?
 
 ### Adding a new per-frame render input (like `camera.sprites`, `camera.lights`)
 
@@ -188,6 +305,28 @@ per-pixel. A per-column or per-sprite resolution that's mathematically
 exact (like wall fog/lighting-position reuse) is both cheaper and not a
 compromise.
 
+### Adding a non-rendering geometry query (like `castRay`, `checkVisibility`)
+
+For a query gameplay/AI needs that's about the level's geometry but
+isn't rendering a frame:
+
+1. Build it from `createRay()`/`stepRay()` directly (the same 2D grid
+   DDA `traceRay()` uses), not by calling `traceRay()` and discarding
+   most of what it computes, and never by calling `renderSnapshot`/
+   `renderColumn` — those do projection and pixel work this kind of
+   query has no use for and shouldn't pay for.
+2. Read whatever cell data the query needs (`sections`, `blocking`,
+   heights) directly via `getCell()` at each step, live — don't snapshot
+   or cache it, so a caller that mutates level data between calls (a
+   door's `sections` changing as it opens) sees it immediately.
+3. Add a `maxSteps` bound (mirroring `traceRay()`'s) even if the loop
+   should always terminate naturally (reaching the query's target
+   distance, or leaving the map) — cheap insurance against a hang on
+   malformed input, not a correctness requirement in the normal case.
+4. Test it with `createPureRaycaster`/`createSegmentFixture` (no DOM
+   needed at all, since there's no image decoding or pixel buffer
+   involved) — see `testCheckVisibility()`.
+
 ### Adding new debug visibility
 
 Add a counter to `createDebugStats()`, increment it behind `if
@@ -219,6 +358,27 @@ prototype mock. The mock assigns fields directly onto
 once you've told it what the math should produce. This exact gap is what
 let the bug above go undetected for a while.
 
+### Precomputing something that depends on a per-frame value
+
+The sky/background used to be a single buffer filled once at
+construction (`fillSky()`, a fixed `height / 2` split) and blitted
+unchanged every frame. That was correct only as long as nothing about
+the background could vary — once pitch could move `renderHorizon` away
+from `height / 2`, the precomputed buffer silently stopped matching
+reality: at steep pitch the background still stopped exactly at the old
+static line, showing a hard cut to black/transparent instead of
+continuing to track the horizon. The general lesson: before caching
+something "once, at construction" for performance, check whether every
+input it depends on is actually construction-time-fixed. `renderHorizon`
+depends on `camera.pitch`, a per-frame value, so anything derived from it
+(now `fillFlatSky`/`renderSky`, parameterized by the current `skyRows`
+every frame) has to be recomputed every frame too, no matter how cheap
+that recomputation is. This didn't reintroduce a real performance cost
+here — `pixels.fill(0)` plus a same-size-as-before fill loop is the same
+cost class as the `pixels.set()` it replaced — it just moved the point
+where the sky region's extent is decided from "once, wrong for pitch"
+to "every frame, correct for pitch."
+
 ### Test rooms that are too small
 
 An integration test that renders a scene and checks the resulting pixel
@@ -230,11 +390,23 @@ pass while proving nothing. Both `testLightingRenderIntegration` and
 `testFogRenderIntegration` assert `planePixelsDrawn > 0` for exactly
 this reason — copy that pattern for any new render-integration test.
 
+A related trap for a feature that changes column-level *behavior*
+(rather than pixel colour) rather than just checking pixels differ:
+prefer comparing debug-stat *counts* between two variants of a scene
+(e.g. `testWallSectionsRenderIntegration` compares `wallSegments`/
+`wallPixels` between a solid boundary and an equivalent one with a gap)
+over predicting exact counts by hand. Exact per-column ray geometry is
+easy to get subtly wrong when reasoned about on paper (e.g. a narrow
+1-cell-wide corridor's side walls contribute to the count too); an
+inequality between "the two scenes must produce different amounts of
+drawing work" is robust to that and still meaningfully proves the
+feature works.
+
 ### The wall/plane hot loops
 
-`drawWall`, `renderPlane`, `drawPlanePixel`, `copyPixel`,
-`copySpritePixel`, and `subtractInterval` run once per screen pixel or
-per screen column, every frame. Before changing them:
+`drawWallSection`, `renderPlane`, `drawPlanePixel`, `copyPixel`,
+`copySpritePixel`, and `subtractInterval` run once per screen pixel, per
+screen column, or per section, every frame. Before changing them:
 
 - Don't allocate objects inside the per-pixel loops (the existing code
   reuses scratch arrays/objects — `segmentScratch`,
@@ -302,12 +474,29 @@ integration test (see `testLightingRenderIntegration`/
 - **No cross-zone fog blending.** Fog is resolved per-surface from
   whichever single cell that surface belongs to — crossing a zone
   boundary is a hard edge, not a gradient.
-- **No sectors/portals, no non-grid geometry.** The level is a uniform
-  grid; doors/windows/openings (`P7` in `plan.md`) aren't implemented
-  yet, and won't be until edge descriptors and openings prove the grid
-  model insufficient.
+- **No sectors/portals, no non-grid geometry.** The level is still a
+  uniform grid — `sections` add windows/arches/railings/overhangs
+  *within* that grid, they don't add rooms of arbitrary shape or
+  portal-style visibility between non-adjacent areas.
+- **No door gameplay, opening/closing logic, collision, or navigation.**
+  `sections` is deliberately just data the renderer draws. A door is
+  meant to be built by a caller changing the `bottom`/`top`/`material` it
+  supplies for a boundary's sections between frames (e.g. animating a
+  gap growing as a door slides open) — the Raycaster has no concept of
+  "door," "open amount," or door state, and shouldn't gain one.
+- **`sections`-aware collision is not provided.** `isWallWorld()`/
+  `blocking` remain whole-cell and coarse, unaware of gaps between
+  sections. A collision system that needs to know whether an entity fits
+  under a specific overhang or through a specific window must read
+  `getCell(x, y).sections` itself and apply its own rule.
 - **No level hot-swapping.** `level` is only ever read at construction;
   changing levels means constructing a new `Raycaster`.
+- **Sky is not a full 3D skybox.** `level.sky` scrolls horizontally with
+  `camera.angle` and fills vertically to the current `renderHorizon`, but
+  the texture is stretched to fit rather than projected per-row — no
+  per-pixel angular mapping, no separate handling for a horizon line
+  within the texture itself. It's one level-wide texture, not multiple
+  faces/directions.
 - **ECS is not wired in yet.** `camera.sprites`/`camera.lights` exist
   specifically so a future `LightSystem`/entity system can feed the
   renderer without the renderer needing to change — see

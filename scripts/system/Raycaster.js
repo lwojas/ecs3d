@@ -18,10 +18,11 @@
 // (perpendicular to the camera plane), never raw Euclidean/ray distance,
 // unless a name explicitly says "ray" (e.g. rayDistance, entryDistance).
 export class Raycaster {
-  // Distance fog's built-in fallback colour matches the sky fill colour
-  // (fillSky() below) -- unconfigured fog blending toward the horizon
-  // colour is the conventional, natural-looking default.
+  // Distance fog's built-in fallback colour matches the flat sky colour
+  // (fillFlatSky() below) -- unconfigured fog blending toward the
+  // horizon colour is the conventional, natural-looking default.
   static DEFAULT_FOG_COLOR = { r: 70, g: 110, b: 160 };
+  static DEFAULT_DEBUG_COLOR = { r: 255, g: 0, b: 255 };
 
   constructor(game, level, options = {}) {
     this.game = game;
@@ -56,6 +57,9 @@ export class Raycaster {
     this.columnDepth.fill(Infinity);
     this.pixelDepth = new Float32Array(this.width * this.height);
     this.pixelDepth.fill(Infinity);
+    // Reused across frames by renderSky() so mapping a texture row to a
+    // screen row isn't recomputed once per column -- see renderSky().
+    this.skyRowScratch = new Int32Array(this.height);
     this.debug = options.debug === true;
     this.debugSpriteAnchors = options.debugSpriteAnchors === true;
     this.debugLogEvery = options.debugLogEvery || 0;
@@ -68,8 +72,6 @@ export class Raycaster {
     this.ctx = this.canvas.getContext("2d");
     this.ctx.imageSmoothingEnabled = false;
     this.imageData = this.ctx.createImageData(this.width, this.height);
-    this.backgroundPixels = new Uint8ClampedArray(this.imageData.data.length);
-    this.fillSky(this.backgroundPixels);
 
     this.sprite = this.game.add.sprite(0, 0, null);
     this.texture = this.game.add.bitmapData(this.width, this.height);
@@ -82,6 +84,12 @@ export class Raycaster {
     this.materialCacheMisses = 0;
     this.map = this.normaliseMap(level.map);
     this.loadCells();
+    // Optional level-wide panoramic sky (level.sky = {texture}). Loaded
+    // once, the same way cell surfaces are -- separate from cell
+    // geometry, collision, and depth rendering (see renderSky()). `null`
+    // when unconfigured, which keeps the existing flat-colour background
+    // path unchanged.
+    this.sky = this.loadSurface(level.sky ?? null);
   }
 
   normaliseMap(map) {
@@ -92,21 +100,45 @@ export class Raycaster {
 
   normaliseCellDefinition(definition = {}) {
     const wall = definition.wall ?? null;
+    const floorHeight =
+      definition.floorHeight ?? this.level.defaultFloorHeight ?? 0;
+    const ceilingHeight =
+      definition.ceilingHeight ??
+      this.level.defaultCeilingHeight ??
+      this.wallHeight;
+    // A cell boundary is either one ordinary full-height wall (`wall`) or a
+    // list of independent vertical bands (`sections`) for windows, arches,
+    // railings, overhangs, or (eventually) doors -- see
+    // raycaster-architecture.md. `sections` wins if both are given; `wall`
+    // is sugar for a single section spanning the whole cell, so ordinary
+    // walls cost nothing extra to render (see drawWallSection()).
+    // Sorted bottom-to-top once here (not per frame) so the renderer can
+    // find each section's neighbours -- and therefore its cap faces, see
+    // drawSectionCaps() -- by simply looking at sections[i - 1]/[i + 1].
+    const sections = (
+      definition.sections
+        ? definition.sections.map((section) => ({
+            bottom: section.bottom ?? floorHeight,
+            top: section.top ?? ceilingHeight,
+            material: section.material ?? null,
+          }))
+        : wall
+          ? [{ bottom: floorHeight, top: ceilingHeight, material: wall }]
+          : []
+    ).sort((a, b) => a.bottom - b.bottom);
     return {
-      floorHeight: definition.floorHeight ?? this.level.defaultFloorHeight ?? 0,
-      ceilingHeight:
-        definition.ceilingHeight ??
-        this.level.defaultCeilingHeight ??
-        this.wallHeight,
+      floorHeight,
+      ceilingHeight,
       wall,
+      sections,
       floor: definition.floor ?? null,
       ceiling: definition.ceiling ?? null,
-      // `wall` controls rendering a vertical face; `blocking` controls
-      // movement collision. They default together (a wall blocks) so
+      // `sections` controls rendering vertical faces; `blocking` controls
+      // movement collision. They default together (any section blocks) so
       // existing levels are unaffected, but a level can set `blocking:
       // false` on a low wall/curb cell to make it a walkable step while
       // still rendering its riser face.
-      blocking: definition.blocking ?? !!wall,
+      blocking: definition.blocking ?? sections.length > 0,
       // A fog "zone" is just whichever cells set `fog`. `fog: true` is a
       // shorthand for the level (or built-in) defaults; `fog: {distance,
       // color}` overrides either independently. No fog on a cell (the
@@ -231,7 +263,16 @@ export class Raycaster {
       this.cells[id] = {
         floorHeight: definition.floorHeight,
         ceilingHeight: definition.ceilingHeight,
+        // `wall` is kept for informational/back-compat introspection only
+        // (e.g. a quick "does this cell have an ordinary wall" check) --
+        // rendering and collision read `sections`, the authoritative list,
+        // exclusively. See normaliseCellDefinition().
         wall: this.loadSurface(definition.wall),
+        sections: definition.sections.map((section) => ({
+          bottom: section.bottom,
+          top: section.top,
+          material: this.loadSurface(section.material),
+        })),
         floor: this.loadSurface(definition.floor),
         ceiling: this.loadSurface(definition.ceiling),
         blocking: definition.blocking,
@@ -329,6 +370,56 @@ export class Raycaster {
     return this.cells[id] || this.cells["0"];
   }
 
+  // Runtime cell mutation for gameplay-driven geometry/collision changes
+  // (doors, switches). Both setters key by cell **id** (as it appears in
+  // the map, e.g. "5"), not by an (x, y) position: every map tile that
+  // shares an id shares the exact same cell object, so mutating it
+  // affects every tile using that id at once. Give each door its own
+  // unique id if it should open independently of others.
+  //
+  // Every read path (isWallWorld, getStandingHeight, renderColumn,
+  // checkVisibility, ...) re-reads the cell fresh each call -- nothing
+  // about a cell is cached or snapshotted at load time -- so a change
+  // made here is visible on the very next render/query, no separate
+  // "apply" or "rebuild" step required.
+
+  // Sets a cell's `sections` from the same raw shape used when authoring
+  // a level (`[{bottom, top, material}, ...]`, heights optional and
+  // defaulting from the cell's current floorHeight/ceilingHeight,
+  // `material` a string/inline-object/material-reference surface, not a
+  // pre-loaded one) -- resolves and sorts them exactly like
+  // normaliseCellDefinition()/loadCells() do at level load. Does not
+  // touch `blocking`; call setCellBlocking() separately if a door's
+  // openness should also change whether it blocks movement -- the
+  // Raycaster doesn't decide that relationship for you.
+  setCellSections(id, sections) {
+    const cell = this.cells[String(id)];
+    if (!cell) {
+      console.warn(`Raycaster: setCellSections() unknown cell id "${id}".`);
+      return null;
+    }
+    cell.sections = (sections ?? [])
+      .map((section) => ({
+        bottom: section.bottom ?? cell.floorHeight,
+        top: section.top ?? cell.ceilingHeight,
+        material: this.loadSurface(section.material ?? null),
+      }))
+      .sort((a, b) => a.bottom - b.bottom);
+    return cell;
+  }
+
+  // Sets a cell's movement-blocking flag directly, independent of its
+  // `sections` -- see setCellSections() above.
+  setCellBlocking(id, blocking) {
+    const cell = this.cells[String(id)];
+    if (!cell) {
+      console.warn(`Raycaster: setCellBlocking() unknown cell id "${id}".`);
+      return null;
+    }
+    cell.blocking = !!blocking;
+    return cell;
+  }
+
   // Movement-blocking check. Driven by the cell's configurable `blocking`
   // flag, not by whether it renders a wall face (`cell.wall`) — a cell can
   // have a wall texture and still be non-blocking (a step/curb).
@@ -340,19 +431,36 @@ export class Raycaster {
     return this.isWall(x / this.cellSize, y / this.cellSize);
   }
 
+  // The inverse of the `x / this.cellSize` conversion used throughout this
+  // file -- cell-space (possibly fractional, e.g. 7.5 for the middle of
+  // cell 7) to world-space. Authored spawn points are stored in cell
+  // space so they keep resolving correctly if `cellSize` changes; nothing
+  // outside the raycaster should reimplement this multiplication.
+  cellToWorld(cellX, cellY) {
+    return {
+      x: cellX * this.cellSize,
+      y: cellY * this.cellSize,
+    };
+  }
+
   // The height a standing entity would rest on in this cell, for callers
   // that want to raise/lower camera/entity Z when moving across cells (e.g.
   // camera.z = raycaster.getEyeHeightWorld(player.x, player.y)).
   //
-  // A non-blocking cell that still has a wall face is a walkable step or
-  // block (see normaliseCellDefinition()): its standing surface is the top
-  // of that block, `ceilingHeight`, not its base. An open cell (no wall, or
-  // a blocking one an entity could never be standing in) rests on its
-  // `floorHeight`.
+  // A non-blocking cell that still has wall geometry (`sections`) is a
+  // walkable step or block (see normaliseCellDefinition()): its standing
+  // surface is the top of the cell, `ceilingHeight`, not its base. This is
+  // a coarse, whole-cell approximation -- it does not reason about which
+  // specific section an entity is under/on for multi-section geometry
+  // (windows, overhangs); that judgement belongs to the collision layer,
+  // which can inspect `cell.sections` directly. An open cell (no
+  // sections, or a blocking one an entity could never be standing in)
+  // rests on its `floorHeight`.
   getStandingHeight(x, y) {
     const cell = this.getCell(x, y);
     if (!cell) return 0;
-    if (cell.wall && !cell.blocking) return cell.ceilingHeight;
+    if ((cell.sections ?? []).length && !cell.blocking)
+      return cell.ceilingHeight;
     return cell.floorHeight;
   }
 
@@ -365,6 +473,51 @@ export class Raycaster {
   // re-deriving the eye-height convention themselves.
   getEyeHeightWorld(x, y) {
     return this.getStandingHeightWorld(x, y) + this.cameraHeight;
+  }
+
+  // A true 3D aim/forward direction (unit vector) for gameplay callers
+  // that need real vertical aim -- projectiles, hitscan, AI aim -- as
+  // opposed to `camera.pitch`, which is a screen-space horizon shift in
+  // pixels for the renderer's 2.5D "look up/down" trick and is never a
+  // real rotation (see raycaster-api.md's Rendering section: "Does not
+  // affect ray tracing, only where the horizon line sits on screen"). Do
+  // not pass `camera.pitch` here -- it is not an angle and mixing the two
+  // up produces exactly the kind of erratic, wrapping direction a bug in
+  // this class used to (feeding a pixel-scale value into Math.cos/sin as
+  // if it were radians). `angle` and `pitchRadians` are both real radians;
+  // `pitchRadians` defaults to 0 (level aim) if omitted. Static because
+  // it's pure trig with no dependency on any Raycaster instance state --
+  // callers that don't have a raycaster handy can still use it via
+  // `Raycaster.getForwardVector(...)`.
+  static getForwardVector(angle, pitchRadians = 0) {
+    const cosPitch = Math.cos(pitchRadians);
+    return {
+      x: Math.cos(angle) * cosPitch,
+      y: Math.sin(angle) * cosPitch,
+      z: Math.sin(pitchRadians),
+    };
+  }
+
+  // The real 3D forward direction that matches what's actually rendered at
+  // screen centre for a given camera -- i.e. the same camera-shaped object
+  // passed to renderSnapshot ({angle, pitch, ...}). Converting `camera.pitch`
+  // to an angle by treating it as degrees or radians directly (a real,
+  // shipped bug -- see ItemSystem.fireFromCamera's history) produces a
+  // vertical angle steeper or shallower than what the player is actually
+  // looking at, because `camera.pitch` is a screen-space horizon shift in
+  // pixels, not an angle at all (see raycaster-api.md). The correct
+  // equivalent angle is derived the same way projectWorldZ() relates world
+  // Z to screen Y: solving `screenY = renderHorizon - worldZOffset *
+  // focalLength / distance` for the world Z offset at screen centre
+  // (screenY = height/2, i.e. renderHorizon - screenY = camera.pitch) gives
+  // `worldZOffset / distance = camera.pitch / focalLength`, i.e.
+  // `tan(pitchAngle) = camera.pitch / focalLength` -- so this is the one
+  // place that conversion should happen, using this instance's own
+  // `focalLength` (the same value projectWorldZ() itself uses), instead of
+  // callers each guessing at degrees/radians.
+  getCameraForwardVector(camera) {
+    const pitchRadians = Math.atan2(camera.pitch ?? 0, this.focalLength);
+    return Raycaster.getForwardVector(camera.angle, pitchRadians);
   }
 
   projectHeight(worldHeight, distance) {
@@ -492,7 +645,7 @@ export class Raycaster {
 
   castRay(originX, originY, angle) {
     for (const segment of this.traceRay(originX, originY, angle)) {
-      if (segment.cell.wall && segment.entrySide !== null) {
+      if ((segment.cell.sections ?? []).length && segment.entrySide !== null) {
         return {
           distance: segment.entryDistance,
           side: segment.entrySide,
@@ -505,6 +658,81 @@ export class Raycaster {
       }
     }
     return null;
+  }
+
+  // Cheap gameplay/AI line-of-sight query, entirely independent of
+  // rendering: reuses the same 2D grid DDA (createRay/stepRay) traceRay()
+  // is built on, but does no projection, texture sampling, or pixel work.
+  // `origin`/`target` are plain {x, y, z?} world-space points (z defaults
+  // to 0, matching sprites/lights); this never renders a frame.
+  //
+  // A cell boundary blocks sight only where one of its `sections` actually
+  // covers the height the straight 3D line has at that point -- an open
+  // section (a window, a gap) is transparent to this exactly as it is to
+  // rendering, and reads the level's live cell data, so a caller that
+  // mutates a cell's `sections` between calls (e.g. a door opening) sees
+  // the change immediately with no separate step required.
+  checkVisibility(origin, target) {
+    const originZ = origin.z ?? 0;
+    const targetZ = target.z ?? 0;
+    const dx = target.x - origin.x;
+    const dy = target.y - origin.y;
+    const dz = targetZ - originZ;
+    const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const clear = () => ({
+      visible: true,
+      distance,
+      hitDistance: null,
+      hitX: null,
+      hitY: null,
+      mapX: null,
+      mapY: null,
+      cell: null,
+    });
+
+    // Purely vertical line of sight (same XY position): no grid boundary
+    // can ever cross it.
+    if (horizontalDistance < 1e-9) return clear();
+
+    const angle = Math.atan2(dy, dx);
+    const ray = this.createRay(origin.x, origin.y, angle);
+    const maxSteps = this.level.width * this.level.height * 2 + 4;
+
+    for (let step = 0; step < maxSteps; step++) {
+      const boundary = this.stepRay(ray);
+      if (boundary.distance >= horizontalDistance) return clear();
+
+      const cell = this.getCell(boundary.mapX, boundary.mapY);
+      const sections = cell?.sections ?? [];
+      if (sections.length) {
+        const fraction = boundary.distance / horizontalDistance;
+        const height = originZ + dz * fraction;
+        for (let i = 0; i < sections.length; i++) {
+          const section = sections[i];
+          if (height >= section.bottom && height <= section.top) {
+            return {
+              visible: false,
+              distance,
+              hitDistance: distance * fraction,
+              hitX: boundary.hitX,
+              hitY: boundary.hitY,
+              mapX: boundary.mapX,
+              mapY: boundary.mapY,
+              cell,
+            };
+          }
+        }
+      }
+      // Stepped outside the defined map without reaching the target or
+      // being blocked -- treat conservatively as not visible rather than
+      // guessing (this implies the target isn't actually within the
+      // level, which shouldn't happen in normal use).
+      if (!this.isInsideMap(boundary.mapX, boundary.mapY)) {
+        return { ...clear(), visible: false };
+      }
+    }
+    return { ...clear(), visible: false };
   }
 
   render(player) {
@@ -571,7 +799,7 @@ export class Raycaster {
   // normaliseCellDefinition()) -- there is no separate zone/region system.
   // Linear falloff by distance, applied per surface using whatever depth
   // that surface already computed for other purposes (see call sites in
-  // drawWall/drawPlanePixel/renderBillboard); no cross-zone blending. A
+  // drawWallSection/drawPlanePixel/renderBillboard); no cross-zone blending. A
   // cell with no `fog` costs nothing here (returns null immediately), so
   // the common unfogged case is unaffected.
   getFogBlend(fog, distance) {
@@ -589,7 +817,21 @@ export class Raycaster {
     }
 
     const pixels = this.imageData.data;
-    pixels.set(this.backgroundPixels);
+    // Recomputed every frame (not a static precomputed buffer) because it
+    // must track the *current* renderHorizon, which shifts with pitch --
+    // a fixed height/2 split previously left the background cut off
+    // below the true horizon at steep pitch, showing a hard black edge
+    // instead of sky continuing down toward the floor. See renderSky().
+    pixels.fill(0);
+    const skyRows = Math.max(
+      0,
+      Math.min(this.height, Math.ceil(this.renderHorizon)),
+    );
+    if (this.sky) {
+      this.renderSky(pixels, camera, skyRows);
+    } else {
+      this.fillFlatSky(pixels, skyRows);
+    }
     this.resetColumnDepth();
     const playerSin = Math.sin(camera.angle);
     const playerCos = Math.cos(camera.angle);
@@ -602,6 +844,13 @@ export class Raycaster {
       lights: resolvedLights,
       active: ambient !== 1 || resolvedLights.length > 0,
     };
+    // Stashed so callers that need this frame's resolved lighting outside
+    // the render pipeline (e.g. tinting a 2D viewmodel/HUD sprite by
+    // sampleLightRgb() at the player's position) can reuse it instead of
+    // calling resolveLights(camera.lights) a second time. Same
+    // no-lifecycle contract as everything else lighting-related: this is
+    // last frame's answer, valid only until the next renderSnapshot() call.
+    this.lastLighting = lighting;
 
     for (let screenX = 0; screenX < this.width; screenX++) {
       const column = this.columnGeometry[screenX];
@@ -626,6 +875,7 @@ export class Raycaster {
       );
     }
     this.renderSprites(camera, camera.sprites, pixels, lighting);
+    this.renderDebugWireframes(camera, camera.debugObjects, pixels);
     if (this.debug) this.debugStats.traceMs = performance.now() - traceStart;
 
     const uploadStart = this.debug ? performance.now() : 0;
@@ -651,7 +901,11 @@ export class Raycaster {
       .sort((a, b) => b.cameraSpace.depth - a.cameraSpace.depth);
 
     for (const { sprite, cameraSpace } of ordered) {
-      this.renderBillboard(camera, sprite, cameraSpace, pixels, lighting);
+      if (sprite.billboard === false) {
+        this.renderOrientedSprite(camera, sprite, pixels, lighting);
+      } else {
+        this.renderBillboard(camera, sprite, cameraSpace, pixels, lighting);
+      }
     }
   }
 
@@ -687,6 +941,145 @@ export class Raycaster {
       depth: cameraSpace.depth,
       projectedScreenX: projection?.centerX ?? null,
     };
+  }
+
+  renderOrientedSprite(camera, sprite, pixels, lighting) {
+    const surface = this.loadSpriteSurface(sprite.texture);
+    if (!surface) return;
+    const size = this.getBillboardWorldSize(sprite);
+    const worldWidth = size.width;
+    const worldHeight = size.height;
+    const z = sprite.z ?? 0;
+    const angle = sprite.angle ?? 0;
+    const halfWidth = worldWidth / 2;
+
+    // `angle` represents the direction the front face points.
+    // The horizontal axis of the sprite is perpendicular to that direction.
+    const axisX = -Math.sin(angle);
+    const axisY = Math.cos(angle);
+
+    const leftWorld = {
+      x: sprite.x - axisX * halfWidth,
+      y: sprite.y - axisY * halfWidth,
+    };
+    const rightWorld = {
+      x: sprite.x + axisX * halfWidth,
+      y: sprite.y + axisY * halfWidth,
+    };
+    const leftCamera = this.getSpriteCameraSpace(camera, leftWorld);
+    const rightCamera = this.getSpriteCameraSpace(camera, rightWorld);
+
+    // If the whole plane is behind the camera, there's nothing to render.
+    if (leftCamera.depth <= 0.0001 && rightCamera.depth <= 0.0001) {
+      return;
+    }
+    // A proper near-plane clip would be needed if one endpoint is behind
+    // the camera. For now, avoid projecting through the camera.
+    if (leftCamera.depth <= 0.0001 || rightCamera.depth <= 0.0001) {
+      return;
+    }
+    const leftScreenX = this.projectLateralToScreenX(
+      leftCamera.lateral,
+      leftCamera.depth,
+    );
+    const rightScreenX = this.projectLateralToScreenX(
+      rightCamera.lateral,
+      rightCamera.depth,
+    );
+    const screenLeft = Math.min(leftScreenX, rightScreenX);
+    const screenRight = Math.max(leftScreenX, rightScreenX);
+    const startX = Math.max(0, Math.ceil(screenLeft));
+    const endX = Math.min(this.width - 1, Math.floor(screenRight));
+
+    if (startX > endX) return;
+
+    // Lighting can remain consistent with billboards initially.
+    // Later you could use the sprite's facing direction for directional
+    // lighting if you add that.
+    const light =
+      lighting && lighting.active
+        ? this.sampleLightRgb(
+            sprite.x,
+            sprite.y,
+            z,
+            lighting.ambient,
+            lighting.lights,
+          )
+        : null;
+    const spriteCell = this.getCell(
+      sprite.x / this.cellSize,
+      sprite.y / this.cellSize,
+    );
+    // Keep track of which projected endpoint corresponds to texture U = 0.
+    const xDirection = rightScreenX - leftScreenX;
+    if (Math.abs(xDirection) < 0.0001) return;
+    for (let screenX = startX; screenX <= endX; screenX++) {
+      // Screen-space interpolation parameter.
+      const screenT = (screenX - leftScreenX) / xDirection;
+
+      // Perspective-correct interpolation.
+      //
+      // Interpolating 1/depth is important here. A simple linear depth
+      // interpolation causes the texture/geometry to distort when viewed
+      // at an angle.
+      const invDepth =
+        (1 - screenT) / leftCamera.depth + screenT / rightCamera.depth;
+      if (invDepth <= 0.000001) continue;
+      const depth = 1 / invDepth;
+
+      // Perspective-correct texture coordinate.
+      const textureT = screenT / rightCamera.depth / invDepth;
+      const textureX = Math.max(
+        0,
+        Math.min(
+          surface.widthPixels - 1,
+          Math.floor(textureT * surface.widthPixels),
+        ),
+      );
+      const bottom = this.projectWorldZ(z, depth);
+      const top = this.projectWorldZ(z + worldHeight, depth);
+      const startY = Math.max(0, Math.ceil(Math.min(top, bottom)));
+      const endY = Math.min(this.height - 1, Math.floor(Math.max(top, bottom)));
+      if (startY > endY) continue;
+      // Fog depth varies across the sprite now, unlike a billboard where
+      // the whole surface has one depth.
+      const fog = this.getFogBlend(spriteCell?.fog, depth);
+      for (let screenY = startY; screenY <= endY; screenY++) {
+        const depthIndex = screenY * this.width + screenX;
+        if (this.pixelDepth[depthIndex] <= depth) continue;
+        const textureY = Math.max(
+          0,
+          Math.min(
+            surface.heightPixels - 1,
+            Math.floor(
+              ((screenY - top) / Math.max(1, bottom - top)) *
+                surface.heightPixels,
+            ),
+          ),
+        );
+        this.copySpritePixel(
+          pixels,
+          screenX,
+          screenY,
+          surface,
+          textureX,
+          textureY,
+          light,
+          fog,
+        );
+      }
+    }
+    if (this.debugSpriteAnchors) {
+      const centerCamera = this.getSpriteCameraSpace(camera, sprite);
+      if (centerCamera.depth > 0.0001) {
+        const centerX = this.projectLateralToScreenX(
+          centerCamera.lateral,
+          centerCamera.depth,
+        );
+        const bottom = this.projectWorldZ(z, centerCamera.depth);
+        this.drawSpriteAnchor(centerX, bottom, pixels);
+      }
+    }
   }
 
   renderBillboard(camera, sprite, cameraSpace, pixels, lighting) {
@@ -814,6 +1207,139 @@ export class Raycaster {
     pixels[index + 3] = 255;
   }
 
+  // Caller-supplied debug shapes (see CollisionSystem's `debug` flag),
+  // drawn straight into the pixel buffer with no texture and no depth-buffer
+  // test -- same approach as drawSpriteAnchor() above -- so a debug cylinder
+  // is always visible on top of the frame regardless of what's in front of
+  // it. `debugObjects` is a plain array of {x, y, z, radius, height, color?,
+  // segments?} entries; nothing about wall/floor/sprite rendering changes.
+  renderDebugWireframes(camera, debugObjects, pixels) {
+    if (!debugObjects || !debugObjects.length) return;
+
+    for (const wireframe of debugObjects) {
+      this.renderDebugCylinder(camera, wireframe, pixels);
+    }
+  }
+
+  // Approximates a cylinder as a ring of vertical edges plus a top and
+  // bottom ring -- enough to read the actual collision diameter, height
+  // and position at a glance without rasterising a true curved surface.
+  renderDebugCylinder(camera, wireframe, pixels) {
+    const {
+      x,
+      y,
+      z = 0,
+      radius = 8,
+      height = 8,
+      segments = 8,
+      color = Raycaster.DEFAULT_DEBUG_COLOR,
+    } = wireframe;
+
+    const bottom = z;
+    const top = z + height;
+    const ring = [];
+
+    for (let i = 0; i < segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      ring.push({
+        x: x + Math.cos(theta) * radius,
+        y: y + Math.sin(theta) * radius,
+      });
+    }
+
+    for (let i = 0; i < segments; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % segments];
+
+      this.drawDebugLine3D(
+        camera,
+        a.x,
+        a.y,
+        bottom,
+        b.x,
+        b.y,
+        bottom,
+        pixels,
+        color,
+      );
+      this.drawDebugLine3D(camera, a.x, a.y, top, b.x, b.y, top, pixels, color);
+      this.drawDebugLine3D(
+        camera,
+        a.x,
+        a.y,
+        bottom,
+        a.x,
+        a.y,
+        top,
+        pixels,
+        color,
+      );
+    }
+  }
+
+  drawDebugLine3D(camera, x1, y1, z1, x2, y2, z2, pixels, color) {
+    const p1 = this.projectDebugPoint(camera, x1, y1, z1);
+    const p2 = this.projectDebugPoint(camera, x2, y2, z2);
+    if (!p1 || !p2) return;
+    this.drawDebugLine2D(
+      p1.screenX,
+      p1.screenY,
+      p2.screenX,
+      p2.screenY,
+      pixels,
+      color,
+    );
+  }
+
+  // World point -> screen point using the exact same camera-space transform
+  // billboards use (getSpriteCameraSpace / projectLateralToScreenX /
+  // projectWorldZ), so a debug wireframe lines up with sprites drawn at the
+  // same world position. Drops (rather than clips) segments crossing the
+  // camera plane, which is fine for a debug aid.
+  projectDebugPoint(camera, x, y, z) {
+    const cameraSpace = this.getSpriteCameraSpace(camera, { x, y });
+    if (cameraSpace.depth <= 0.0001) return null;
+    return {
+      screenX: this.projectLateralToScreenX(
+        cameraSpace.lateral,
+        cameraSpace.depth,
+      ),
+      screenY: this.projectWorldZ(z, cameraSpace.depth),
+    };
+  }
+
+  // Bresenham line rasteriser writing straight through setDebugPixel().
+  drawDebugLine2D(x1, y1, x2, y2, pixels, color) {
+    let x = Math.round(x1);
+    let y = Math.round(y1);
+    const endX = Math.round(x2);
+    const endY = Math.round(y2);
+
+    const dx = Math.abs(endX - x);
+    const dy = Math.abs(endY - y);
+    const stepX = endX >= x ? 1 : -1;
+    const stepY = endY >= y ? 1 : -1;
+    let error = dx - dy;
+
+    // Bounded by the segment's own screen-space extent -- a debug edge
+    // seen end-on near the camera can still span an enormous pixel
+    // distance, so this can't spin longer than the line actually is.
+    const maxSteps = dx + dy + 1;
+    for (let step = 0; step <= maxSteps; step++) {
+      this.setDebugPixel(pixels, x, y, color.r, color.g, color.b);
+      if (x === endX && y === endY) break;
+      const error2 = error * 2;
+      if (error2 > -dy) {
+        error -= dy;
+        x += stepX;
+      }
+      if (error2 < dx) {
+        error += dx;
+        y += stepY;
+      }
+    }
+  }
+
   getBillboardWorldSize(sprite) {
     const scale = sprite.scale ?? 1;
     const scaleX = typeof scale === "number" ? scale : (scale.x ?? 1);
@@ -868,16 +1394,67 @@ export class Raycaster {
     );
   }
 
-  fillSky(pixels) {
-    const horizon = Math.floor(this.height / 2);
+  // Flat-colour sky (no level.sky configured): fills rows [0, skyRows).
+  // `skyRows` is renderHorizon for the current frame, clamped to the
+  // screen -- not a fixed half of the screen -- so it always reaches
+  // exactly as far as the current pitch implies, all the way to filling
+  // the whole screen if pitched to look straight up.
+  fillFlatSky(pixels, skyRows) {
     const sky = Raycaster.DEFAULT_FOG_COLOR;
-    for (let y = 0; y < horizon; y++) {
+    for (let y = 0; y < skyRows; y++) {
       for (let x = 0; x < this.width; x++) {
         const index = (y * this.width + x) * 4;
         pixels[index] = sky.r;
         pixels[index + 1] = sky.g;
         pixels[index + 2] = sky.b;
         pixels[index + 3] = 255;
+      }
+    }
+  }
+
+  // Panoramic/cylindrical sky (level.sky configured): fills rows
+  // [0, skyRows) with a texture that scrolls horizontally with
+  // camera.angle only -- player x/y never enter this calculation, so
+  // moving never pans the sky, only turning does. Vertically, the
+  // texture is simply stretched to fill the current sky region (no
+  // per-row perspective projection -- this is deliberately not a full 3D
+  // skybox), so `skyRows` tracks pitch exactly the same way
+  // fillFlatSky()'s does, fixing the same cutoff-at-the-horizon issue.
+  // Entirely separate from cell geometry/collision/pixelDepth: this never
+  // touches the world grid or the depth buffer.
+  renderSky(pixels, camera, skyRows) {
+    if (skyRows <= 0) return;
+    const sky = this.sky;
+    const twoPi = Math.PI * 2;
+
+    const textureRows = this.skyRowScratch;
+    for (let screenY = 0; screenY < skyRows; screenY++) {
+      textureRows[screenY] = Math.max(
+        0,
+        Math.min(
+          sky.heightPixels - 1,
+          Math.floor((screenY / skyRows) * sky.heightPixels),
+        ),
+      );
+    }
+
+    for (let screenX = 0; screenX < this.width; screenX++) {
+      const angle = camera.angle + this.columnGeometry[screenX].angleOffset;
+      const normalizedAngle = ((angle % twoPi) + twoPi) % twoPi;
+      const textureX = Math.max(
+        0,
+        Math.min(
+          sky.widthPixels - 1,
+          Math.floor((normalizedAngle / twoPi) * sky.widthPixels),
+        ),
+      );
+      for (let screenY = 0; screenY < skyRows; screenY++) {
+        const source = (textureRows[screenY] * sky.widthPixels + textureX) * 4;
+        const destination = (screenY * this.width + screenX) * 4;
+        pixels[destination] = sky.pixels[source];
+        pixels[destination + 1] = sky.pixels[source + 1];
+        pixels[destination + 2] = sky.pixels[source + 2];
+        pixels[destination + 3] = 255;
       }
     }
   }
@@ -900,32 +1477,57 @@ export class Raycaster {
     for (const segment of segments) {
       if (!visibleCount) break;
 
-      if (segment.cell.wall && segment.entrySide !== null) {
-        if (this.debug) this.debugStats.wallSegments++;
+      // A boundary is one or more independent vertical sections (an
+      // ordinary full-height wall is just a single section spanning the
+      // whole cell -- see normaliseCellDefinition()). Each section is
+      // projected and drawn on its own, so an open gap between two
+      // sections naturally leaves that screen interval available for
+      // whatever is behind this boundary (this cell's own floor/ceiling
+      // below, or a further segment through the gap).
+      const sections = segment.cell.sections ?? [];
+      if (sections.length && segment.entrySide !== null) {
         const distance = this.getCorrectedDistance(
           segment.entryDistance,
           rayAngle,
           camera.angle,
         );
         segment.projectedDistance = distance;
-        const top = this.projectWorldZ(segment.cell.ceilingHeight, distance);
-        const bottom = this.projectWorldZ(segment.cell.floorHeight, distance);
-        this.drawWall(
-          screenX,
-          segment,
-          top,
-          bottom,
-          pixels,
-          visible,
-          visibleCount,
-          lighting,
-        );
-        visibleCount = this.subtractInterval(
-          visible,
-          top,
-          bottom,
-          visibleCount,
-        );
+        for (let i = 0; i < sections.length && visibleCount; i++) {
+          const section = sections[i];
+          if (this.debug) this.debugStats.wallSegments++;
+          const top = this.projectWorldZ(section.top, distance);
+          const bottom = this.projectWorldZ(section.bottom, distance);
+          this.drawWallSection(
+            screenX,
+            segment,
+            section,
+            top,
+            bottom,
+            pixels,
+            visible,
+            visibleCount,
+            lighting,
+          );
+          visibleCount = this.subtractInterval(
+            visible,
+            top,
+            bottom,
+            visibleCount,
+          );
+          if (!visibleCount) break;
+          visibleCount = this.drawSectionCaps(
+            camera,
+            screenX,
+            segment,
+            sections,
+            i,
+            rayCos,
+            pixels,
+            visible,
+            visibleCount,
+            lighting,
+          );
+        }
         if (!visibleCount && this.columnDepth[screenX] === Infinity) {
           this.columnDepth[screenX] = distance;
         }
@@ -1038,9 +1640,77 @@ export class Raycaster {
     return this.projectWorldZ(planeHeight, rayDistance * rayCos);
   }
 
-  drawWall(
+  // A section's vertical face alone leaves its horizontal top/bottom
+  // undrawn -- a sill has a visible top, a lintel a visible underside,
+  // wherever there's actually open space adjacent to draw into. A cap is
+  // just a floor/ceiling-shaped plane scoped to this one section's height,
+  // so this reuses renderPlane() rather than inventing new geometry: an
+  // ordinary full-height wall (one section, `sections[i-1]`/`[i+1]` both
+  // absent, its own bottom/top equal to the cell's floor/ceiling) draws
+  // zero caps, so this costs nothing for the common case. `sections` is
+  // sorted by `bottom` (see normaliseCellDefinition()), so neighbours are
+  // just `sections[i - 1]`/`sections[i + 1]`.
+  drawSectionCaps(
+    camera,
     screenX,
     segment,
+    sections,
+    index,
+    rayCos,
+    pixels,
+    visible,
+    visibleCount,
+    lighting,
+  ) {
+    const section = sections[index];
+    const ceilingBound =
+      index + 1 < sections.length
+        ? sections[index + 1].bottom
+        : segment.cell.ceilingHeight;
+    if (section.top < ceilingBound) {
+      visibleCount = this.renderPlane(
+        camera,
+        screenX,
+        segment,
+        section.material,
+        section.top,
+        rayCos,
+        pixels,
+        visible,
+        visibleCount,
+        lighting,
+      );
+      if (!visibleCount) return visibleCount;
+    }
+    const floorBound =
+      index > 0 ? sections[index - 1].top : segment.cell.floorHeight;
+    if (section.bottom > floorBound) {
+      visibleCount = this.renderPlane(
+        camera,
+        screenX,
+        segment,
+        section.material,
+        section.bottom,
+        rayCos,
+        pixels,
+        visible,
+        visibleCount,
+        lighting,
+      );
+    }
+    return visibleCount;
+  }
+
+  // Draws one wall section (see normaliseCellDefinition()). For an
+  // ordinary full-height wall this is the only section and behaves
+  // identically to the single-wall renderer this replaced -- same work per
+  // pixel, just reading `section.bottom/top/material` instead of
+  // `segment.cell.floorHeight/ceilingHeight/wall`. Multi-section cells pay
+  // for exactly the extra sections they define, nothing more.
+  drawWallSection(
+    screenX,
+    segment,
+    section,
     top,
     bottom,
     pixels,
@@ -1048,30 +1718,35 @@ export class Raycaster {
     visibleCount,
     lighting,
   ) {
-    const wall = segment.cell.wall;
+    const material = section.material;
     const start = Math.max(0, Math.ceil(top));
     const end = Math.min(this.height - 1, Math.floor(bottom));
-    if (start > end || !Number.isFinite(top) || !Number.isFinite(bottom))
+    if (
+      !material ||
+      start > end ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(bottom)
+    )
       return;
-    const wallHeight = segment.cell.ceilingHeight - segment.cell.floorHeight;
+    const sectionHeight = section.top - section.bottom;
     const projectedHeight = bottom - top;
-    if (wallHeight <= 0 || projectedHeight <= 0) return;
+    if (sectionHeight <= 0 || projectedHeight <= 0) return;
 
     const wallPositionWorld =
       segment.entrySide === 0 ? segment.entryHitY : segment.entryHitX;
     const textureX = Math.max(
       0,
       Math.min(
-        wall.widthPixels - 1,
+        material.widthPixels - 1,
         Math.floor(
-          (this.wrap(wallPositionWorld, wall.width) / wall.width) *
-            wall.widthPixels,
+          (this.wrap(wallPositionWorld, material.width) / material.width) *
+            material.widthPixels,
         ),
       ),
     );
-    // The whole wall segment sits at one perpendicular depth regardless of
-    // row (only its texture row varies), so fog is resolved once per
-    // column rather than once per pixel.
+    // The whole section sits at one perpendicular depth regardless of row
+    // (only its texture row varies), so fog is resolved once per section
+    // rather than once per pixel.
     const fog = this.getFogBlend(
       segment.cell.fog,
       segment.projectedDistance ?? segment.entryDistance,
@@ -1080,15 +1755,15 @@ export class Raycaster {
       if (this.debug) this.debugStats.wallPixels++;
       if (!this.isYVisible(visible, visibleCount, y)) continue;
       const position = (y - top) / projectedHeight;
-      const worldZ = segment.cell.ceilingHeight - position * wallHeight;
+      const worldZ = section.top - position * sectionHeight;
       const textureY = Math.max(
         0,
         Math.min(
-          wall.heightPixels - 1,
+          material.heightPixels - 1,
           Math.floor(
-            (this.wrap(worldZ - segment.cell.floorHeight, wall.height) /
-              wall.height) *
-              wall.heightPixels,
+            (this.wrap(worldZ - section.bottom, material.height) /
+              material.height) *
+              material.heightPixels,
           ),
         ),
       );
@@ -1102,7 +1777,16 @@ export class Raycaster {
               lighting.lights,
             )
           : null;
-      this.copyPixel(pixels, screenX, y, wall, textureX, textureY, light, fog);
+      this.copyPixel(
+        pixels,
+        screenX,
+        y,
+        material,
+        textureX,
+        textureY,
+        light,
+        fog,
+      );
       this.pixelDepth[y * this.width + screenX] = Math.min(
         this.pixelDepth[y * this.width + screenX],
         segment.projectedDistance ?? segment.entryDistance,
@@ -1337,5 +2021,6 @@ export class Raycaster {
     this.imageData = null;
     this.cells = {};
     this.materialCache = Object.create(null);
+    this.sky = null;
   }
 }

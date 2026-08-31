@@ -1,13 +1,18 @@
 import { Entity } from "../entities/Entity.js";
 import { componentClasses } from "./ComponentClasses.js";
 import { EntityStore } from "./EntityStore.js";
-import { InitManager } from "../system/init/InitManager.js";
 
 export class PrefabFactory {
-  constructor(entityManager, componentDefaults, levelData) {
+  constructor(entityManager, componentDefaults) {
     this.entityManager = entityManager;
     this.componentDefaults = componentDefaults;
-    this.levelData = levelData;
+  }
+
+  // Exposed so EntitySpawner can apply session modifiers against the
+  // *resolved* template (defaults a caller never explicitly overrides),
+  // not just whatever override layer it happens to be given.
+  getDefaultComponents(type) {
+    return this.componentDefaults[type] || {};
   }
 
   createEntity(entityData) {
@@ -38,24 +43,35 @@ export class PrefabFactory {
     entity.snapshot = mergedComponents;
     // Add merged components to the entity
     for (const [componentName, componentData] of Object.entries(
-      mergedComponents
+      mergedComponents,
     )) {
       if (componentClasses[componentName]) {
         entity.addComponent(
           new componentClasses[componentName](entity, componentData),
           // For snapshot:
-          componentData
+          componentData,
         );
       }
     }
 
+    // A duplicated uniqueId in authored data silently produces two
+    // separate Entity objects (EntityManager has no dedup) -- the second
+    // wins whichever id-keyed lookup (e.g. GameSession.entityById) is
+    // built afterward, while the first becomes an orphan that's still
+    // fully alive in every system's component lists (a static, never-
+    // updated collider is exactly what this looks like for anything with
+    // a CollisionComponent). Not fatal -- just loud, since this is easy
+    // to introduce by copy-pasting an authored entity.
+    if (
+      uniqueId &&
+      this.entityManager.world.some((existing) => existing.id === uniqueId)
+    ) {
+      console.warn(
+        `PrefabFactory: duplicate uniqueId "${uniqueId}" -- creating a second, separate entity.`,
+      );
+    }
+
     this.entityManager.addEntity(entity);
     return entity;
-  }
-
-  loadLevel(levelData = this.levelData) {
-    return levelData.entities.map((entityData) =>
-      this.createEntity(entityData)
-    );
   }
 }

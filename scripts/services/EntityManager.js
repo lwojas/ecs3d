@@ -1,11 +1,10 @@
 import { ServiceLocator } from "./ServiceLocator.js";
-import { InitManager } from "../system/init/InitManager.js";
 import { componentClasses } from "./ComponentClasses.js";
 
 export class EntityManager {
   constructor() {
     ServiceLocator.register("game", "EntityManager", this);
-    this.initManager = new InitManager();
+
     this.world = [];
     this.worldHash = new Map();
     this.entities = new Set();
@@ -20,7 +19,7 @@ export class EntityManager {
 
   addEntity(entity) {
     // Initialise the entity - add a sprite and physics if needed
-    this.initManager.initEntity(entity);
+
     // console.log(entity);
     this.world.push(entity);
     this.worldHash.set(entity, this.world.length - 1);
@@ -33,7 +32,7 @@ export class EntityManager {
 
   updateEntityLists(entity) {
     for (let [system, entityList] of this.systemEntityLists.entries()) {
-      console.log(system);
+      // console.log(system);
       const newList = [];
       this.world.forEach((worldEnity) => {
         const requiredComponents = system.requiredComponents;
@@ -63,7 +62,7 @@ export class EntityManager {
 
   registerSystem(system, requiredComponents) {
     system.requiredComponents = requiredComponents;
-    console.log(requiredComponents);
+    // console.log(requiredComponents);
     const filteredEntities = [...this.world].filter((entity) =>
       requiredComponents.every(
         (comp) => entity.hasComponent(comp) && entity.isEnabled,

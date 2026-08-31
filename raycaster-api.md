@@ -60,7 +60,7 @@ Plain data describing the map. See [Level Data Format](#2-level-data-format) bel
 | `fov` | `Math.PI / 3` (60°) | **Horizontal** field of view, in radians. This is the sole basis for `focalLength` and per-column ray angles — never derived from `height`. |
 | `maxDistance` | `Math.max(level.width, level.height) * cellSize` | Rays stop tracing beyond this world distance. |
 | `visibleIntervalCapacity` | `8` | Max number of separate visible vertical spans tracked per screen column (relevant only with many stacked partial-height walls in one column; the default is generous). |
-| `debug` | `false` | Enables the debug counters (see [Diagnostics](#6-diagnostics)). No per-frame cost when `false`. |
+| `debug` | `false` | Enables the debug counters (see [Diagnostics](#9-diagnostics)). No per-frame cost when `false`. |
 | `debugSpriteAnchors` | `false` | Draws a small magenta cross at each sprite's projected anchor point (bottom-center), for visually checking sprite placement. |
 | `debugLogEvery` | `0` (never) | If `debug: true` and this is e.g. `60`, dumps a `console.table` of the debug stats every 60th frame. |
 
@@ -77,6 +77,7 @@ export const myLevel = {
   defaultCeilingHeight: 2.5,  // optional, else the `wallHeight` option
   defaultFogDistance: 20,     // optional, else 20
   defaultFogColor: { r, g, b }, // optional, else Raycaster.DEFAULT_FOG_COLOR
+  sky: { texture: "skyTexture" }, // optional, else no sky (flat background colour) -- see below
 
   map: [
     "1111111111111111",       // rows of characters, or arrays of strings/numbers
@@ -108,23 +109,65 @@ export const myLevel = {
 {
   floorHeight: 0,        // world Z of the floor
   ceilingHeight: 2.5,    // world Z of the ceiling
-  wall: null,            // surface | string | null — renders a vertical face when set
+  wall: null,            // surface | string | null — sugar for one section spanning floorHeight..ceilingHeight
+  sections: undefined,   // [{bottom, top, material}, ...] — independent vertical bands; see below
   floor: null,           // surface | string | null — null means no floor drawn
   ceiling: null,         // surface | string | null — null means sky is visible
-  blocking: undefined,   // bool, defaults to !!wall — see "steps" below
+  blocking: undefined,   // bool, defaults to sections.length > 0 — see "steps" below
   fog: undefined,        // true | {distance, color} | falsy — see "fog zones" below
 }
 ```
 
 All fields are optional; omitted fields fall back to the defaults above.
 
-**`wall` controls rendering, `blocking` controls collision — they are
-independent.** A cell with a wall texture and `blocking: false` renders a
-solid-looking block but does not stop movement — this is how to make a
-walkable step or curb (see `3dtestLevel.js` cell `3` for a working
-example: `ceilingHeight: 0.5, wall: {...}, blocking: false`). Standing on
-such a cell rests on the *top* of the block (`ceilingHeight`), not its
-base — see `getStandingHeight()` below.
+**A cell boundary is one or more independent vertical wall sections, not
+necessarily one solid span.** `wall` is sugar for the common case — a
+single section spanning the whole cell — and is normalized into a
+one-entry `sections` list internally. Use `sections` directly for
+windows, arches, railings, partial walls, overhangs, or (eventually)
+doors that need to change their open amount:
+
+```js
+sections: [
+  { bottom: 0, top: 1, material: "brick" },   // sill
+  { bottom: 2, top: 2.5, material: "brick" }, // lintel
+  // 1 -- 2 is left open: something can be seen/walked through here
+]
+```
+
+- Each section's `bottom`/`top` are world Z heights (same units as
+  `floorHeight`/`ceilingHeight`); either can be omitted and defaults to
+  the cell's own `floorHeight`/`ceilingHeight`.
+- `material` is a "surface" value (see [Surface format](#surface-format) below) — string, inline object, or material reference, exactly like `wall`.
+- `sections` wins over `wall` if both are given on the same cell.
+- Gaps between sections (and above/below the defined ones, up to the
+  cell's own `floorHeight`/`ceilingHeight`) are open: rendering falls
+  through to whatever is behind the boundary for those screen rows,
+  using the existing visible-interval system — no special handling
+  needed on your part.
+- Each section also renders its own horizontal top/bottom face wherever
+  it borders open space — a sill's top, a lintel's underside — using the
+  same `material`. You don't need to add a separate top/bottom surface
+  yourself; a solid full-height wall (whose own bottom/top already reach
+  the cell's floor/ceiling) simply has no cap to draw.
+- **Rendering only.** The Raycaster does not decide whether an entity can
+  walk under/through an open section — see [`isWallWorld`](#6-collision--world-queries),
+  which only exposes a whole-cell `blocking` flag. A collision system
+  that needs finer-grained reasoning (e.g. "can this entity fit under
+  this overhang") should read `getCell(x, y).sections` directly and
+  apply its own rule; the Raycaster deliberately doesn't have an opinion
+  about that.
+- An ordinary single-section wall costs the renderer no more than before
+  `sections` existed — the extra cost is proportional only to how many
+  *additional* sections a level actually uses.
+
+**`sections`/`wall` control rendering, `blocking` controls collision —
+they are independent.** A cell with wall geometry and `blocking: false`
+renders a solid-looking block but does not stop movement — this is how
+to make a walkable step or curb (see `3dtestLevel.js` cell `3` for a
+working example: `ceilingHeight: 0.5, wall: {...}, blocking: false`).
+Standing on such a cell rests on the *top* of the block (`ceilingHeight`),
+not its base — see `getStandingHeight()` below.
 
 **Fog zones are just whichever cells set `fog`.** There is no separate
 region/polygon system.
@@ -139,9 +182,10 @@ fog: { distance: 20, color: { r, g, b } }   // full control
 color (linear ramp from 0 at distance 0). Falsy/omitted `fog` (the
 default) costs nothing at render time.
 
-### Surface format (`wall` / `floor` / `ceiling` / a light's implicit texture)
+### Surface format
 
-A surface value can be:
+Used by `wall`/`sections[].material`/`floor`/`ceiling`. A surface value
+can be:
 
 | Form | Example | Meaning |
 |---|---|---|
@@ -149,6 +193,37 @@ A surface value can be:
 | String | `wall: "brick"` | Looked up in `level.materials.brick`. |
 | Inline object | `wall: { texture: "wallTexture", width: 4, height: 4 }` | `texture` is the Phaser image cache key. `width`/`height` are the **world-space size the texture tile repeats over** — independent of the source image's pixel dimensions, and independent of `cellSize`. Both default to `cellSize` if omitted. |
 | Material reference + override | `wall: { material: "brick", height: 3 }` | Resolves `level.materials.brick`, then shallow-merges the given object on top (so `height` here overrides the material's own `height`). |
+
+### Sky
+
+```js
+level.sky = { texture: "skyTexture" }; // any surface form works: string, inline object, or {material, ...overrides}
+```
+
+A single, level-wide panoramic/cylindrical sky, loaded through the same
+surface pipeline as `wall`/`floor`/`ceiling` (same caching, same
+`level.materials` support). It's a background, not geometry:
+
+- **Visible wherever nothing else is drawn** — in practice, wherever a
+  cell has `ceiling: null`. No per-cell configuration; it's one texture
+  for the whole level.
+- **Horizontal position follows `camera.angle` only.** The texture wraps
+  exactly once around a full 360°, so turning scrolls it and it's always
+  seamless at the wrap point. `camera.x`/`camera.y` never enter the
+  calculation — moving the camera does not pan the sky at all.
+- **Vertical position tracks `camera.pitch`.** The sky fills from the
+  top of the screen down to the current horizon (`renderHorizon`, which
+  already accounts for pitch) — not a fixed half of the screen — so
+  looking up/down changes how much sky is visible exactly the way it
+  should, including filling the entire screen if pitched to look
+  straight up. The texture is stretched to fit that region; there's no
+  per-row perspective projection (deliberately not a full 3D skybox).
+- **No `sky` configured** (the default): falls back to the existing flat
+  background colour (`Raycaster.DEFAULT_FOG_COLOR`), filling the same
+  dynamic region. Existing levels are unaffected either way.
+- Independent of cell geometry, collision, and the depth buffers
+  (`columnDepth`/`pixelDepth`) — it's drawn once, before any column/
+  sprite rendering, and nothing about it participates in occlusion.
 
 ---
 
@@ -264,6 +339,21 @@ lifecycle owned by the renderer, rebuild the array every frame.
   your array.
 - Walls, floor/ceiling, and sprites are all lit consistently by the same
   `sampleLightRgb()` function.
+- **Lighting a 2D/HUD sprite the raycaster never sees** (e.g. a first-person
+  weapon/item viewmodel drawn as an ordinary Phaser sprite, not a
+  `camera.sprites` entry): call `raycaster.sampleLightRgb(x, y, z, ambient,
+  lights)` yourself — it's a plain function with no dependency on the
+  render pipeline. It needs *resolved* lights (`radiusSquared`/`tintR`
+  etc.), not the raw `camera.lights` shape, so either call
+  `raycaster.resolveLights(rawLights)` yourself, or — cheaper — reuse
+  `raycaster.lastLighting`, the exact `{ambient, lights, active}` object
+  `renderSnapshot()` just resolved this frame (stashed specifically so
+  callers outside the pipeline don't have to resolve the same list twice).
+  It's last frame's answer, valid only until the next `renderSnapshot()`
+  call — read it right after rendering, don't cache it further yourself.
+  The result is a raw `{r, g, b}` multiplier (0..~2, unclamped, the same
+  values every wall/plane/sprite pixel gets multiplied by) — converting
+  that into a Phaser `sprite.tint` (`0xRRGGBB`) is the caller's job.
 
 ---
 
@@ -279,8 +369,8 @@ suffix); the non-`World` variants take cell-space coordinates directly
 | `isWallWorld(x, y)` | `boolean` | Movement collision. `true` = blocked. Respects the cell's `blocking` flag, **not** raw `wall` presence — a step (`blocking: false`) returns `false` even though it renders a wall face. |
 | `getStandingHeightWorld(x, y)` | `number` | The world Z an entity standing at `(x, y)` would rest on. For a walkable step (wall + `blocking: false`), this is the block's *top* (`ceilingHeight`); for an open cell, its `floorHeight`. |
 | `getEyeHeightWorld(x, y)` | `number` | `getStandingHeightWorld(x, y) + cameraHeight` — the value to assign to `camera.z`/`player.z` in one call. |
-| `getCell(x, y)` | cell object or `undefined` | Lower-level: the loaded cell (`floorHeight`, `ceilingHeight`, `wall`, `floor`, `ceiling`, `blocking`, `fog`) at **cell-space** `(x, y)`. Use for custom queries not covered above. |
-| `castRay(originX, originY, angle)` | `{distance, side, mapX, mapY, hitX, hitY, cell}` or `null` | Hitscan: first cell whose raw `wall` is truthy along the ray (ignores `blocking` — a step still stops a hitscan ray). Useful for weapons/line-of-sight, not movement. |
+| `getCell(x, y)` | cell object or `undefined` | Lower-level: the loaded cell (`floorHeight`, `ceilingHeight`, `wall`, `sections`, `floor`, `ceiling`, `blocking`, `fog`) at **cell-space** `(x, y)`. Use for custom queries not covered above — e.g. a collision system reasoning about a specific `sections` gap (an overhang, a window) needs to read `sections` here directly; the Raycaster has no built-in opinion about that. |
+| `castRay(originX, originY, angle)` | `{distance, side, mapX, mapY, hitX, hitY, cell}` or `null` | Hitscan: first cell with any wall geometry (`cell.sections.length > 0`) along the ray (ignores `blocking` — a step still stops a hitscan ray). Useful for weapons/line-of-sight, not movement. |
 
 Typical per-frame movement pattern (see `scripts/level-whiteroom.js`):
 
@@ -292,7 +382,95 @@ player.z = raycaster.getEyeHeightWorld(player.x, player.y);
 
 ---
 
-## 7. Diagnostics
+## 7. Runtime Cell Mutation (Doors, Switches)
+
+```js
+raycaster.setCellSections("doorNorth", []); // no wall geometry: fully open
+raycaster.setCellBlocking("doorNorth", false); // no longer blocks movement
+```
+
+Both setters key by cell **id** (as it appears in the map, e.g. `"5"`),
+**not** by an `(x, y)` position — every map tile using that id shares the
+exact same cell object, so mutating it affects every tile with that id
+at once. **Give each door its own unique id** if it should open
+independently of others (reusing a common id like `"1"` for a door would
+also open every ordinary wall using that id).
+
+Every read path (`isWallWorld`, `getStandingHeight`, rendering,
+`checkVisibility`) re-reads a cell fresh on every call — nothing about a
+cell is cached or snapshotted at level load. A change made here is
+visible on the very next render or query; there's no separate "apply" or
+"rebuild" step.
+
+| Method | Effect |
+|---|---|
+| `setCellSections(id, sections)` | Replaces the cell's `sections`. `sections` is the same raw shape used when authoring a level (`[{bottom, top, material}, ...]`, heights optional and defaulting from the cell's *current* `floorHeight`/`ceilingHeight`, `material` a string/inline-object/material-reference — not a pre-loaded surface). Resolved and sorted exactly like level loading does. Does **not** touch `blocking` — call `setCellBlocking()` too if a door's openness should also change whether it blocks movement; the Raycaster doesn't decide that relationship for you. |
+| `setCellBlocking(id, blocking)` | Sets the cell's `blocking` flag directly, independent of its `sections`. |
+
+Both return the updated cell object, or `null` (with a `console.warn`)
+if `id` doesn't exist — they never throw on a bad id.
+
+A minimal door, opening and closing purely by re-calling these two
+setters as needed — no timers, tweening, or animation logic belongs to
+the Raycaster; drive that from wherever your door's state lives:
+
+```js
+function setDoorOpen(raycaster, doorId, open) {
+  raycaster.setCellSections(doorId, open ? [] : [{ material: "doorTexture" }]);
+  raycaster.setCellBlocking(doorId, !open);
+}
+```
+
+---
+
+## 8. Line-of-Sight Queries (AI/Gameplay)
+
+```js
+const result = raycaster.checkVisibility(
+  { x: enemy.x, y: enemy.y, z: enemy.z },
+  { x: player.x, y: player.y, z: player.z },
+);
+if (result.visible) {
+  // enemy can see the player, result.distance away
+}
+```
+
+`checkVisibility(origin, target)` is a **cheap geometry-only query,
+completely separate from rendering** — it does no projection, texture
+sampling, or pixel work, and never renders a frame. Use it for AI/gameplay
+line-of-sight checks without invoking `render`/`renderSnapshot` at all.
+
+- `origin`/`target` are plain `{x, y, z?}` world-space points. `z`
+  defaults to `0` if omitted, matching sprites/lights.
+- It walks the same grid DDA traversal the renderer's `traceRay()` is
+  built on, but only checks whether a straight 3D line from `origin` to
+  `target` passes through solid geometry — a cell boundary only blocks
+  sight where one of its `sections` actually covers the height that line
+  has at that point. **An open section (a window, a gap) is transparent
+  to this exactly as it is to rendering.** Since it reads the level's
+  live cell data on every call, a caller that changes a cell's `sections`
+  between calls (e.g. an opening door) sees the change immediately —
+  there's no separate cache or snapshot to invalidate.
+- It does **not** check floor/ceiling occlusion — only wall `sections`.
+  A line of sight that would need to pass through a floor or ceiling
+  surface (rather than a wall section) is not currently blocked by that.
+- It does **not** check `blocking` — a section blocks sight regardless of
+  whether it blocks movement (mirroring `castRay()`).
+
+Return shape:
+
+| Field | Meaning |
+|---|---|
+| `visible` | `true`/`false`. |
+| `distance` | Always the full 3D distance from `origin` to `target`, regardless of `visible`. |
+| `hitDistance` | 3D distance from `origin` to the obstruction, or `null` when `visible`. |
+| `hitX`, `hitY` | World position where the blocking boundary was crossed, or `null`. |
+| `mapX`, `mapY` | Cell-space coordinates of the blocking cell, or `null`. |
+| `cell` | The blocking cell object (see `getCell()` above), or `null`. |
+
+---
+
+## 9. Diagnostics
 
 | Method / Option | Purpose |
 |---|---|
@@ -312,7 +490,87 @@ entries).
 
 ---
 
-## 8. Lifecycle
+## 10. Common Gameplay Recipes
+
+Two gameplay-adjacent queries come up often enough to be worth spelling
+out explicitly, even though neither needs a new method — both are
+already cheap combinations of what's above. Like `checkVisibility()`,
+neither renders a frame or touches the pixel buffer, and neither knows
+anything about weapons, players, or projectiles — they're purely
+geometric.
+
+### Is a sprite dead-center in the camera? (weapon aiming / hit detection)
+
+```js
+const projection = raycaster.getSpriteProjectionDiagnostic(camera, sprite);
+const offCenter = Math.abs(projection.projectedScreenX - raycaster.width / 2);
+const isDeadCenter = offCenter < tolerancePixels; // tolerance is a gameplay call
+```
+
+`getSpriteProjectionDiagnostic(camera, sprite)` (see [Diagnostics](#9-diagnostics)
+above) already does the full camera-space transform and billboard
+projection for one sprite — pure math, no drawing — and returns
+`projectedScreenX` directly, which is exactly what you compare against
+`raycaster.width / 2` for a reticle/center-of-view check. `depth` in the
+same result gives you range for free.
+
+**Being dead-center doesn't mean unobstructed** — a wall could be
+between the camera and the sprite. Combine it with a visibility check
+for a real hit test:
+
+```js
+function canHitSprite(raycaster, camera, sprite, tolerancePixels) {
+  const projection = raycaster.getSpriteProjectionDiagnostic(camera, sprite);
+  const offCenter = Math.abs(projection.projectedScreenX - raycaster.width / 2);
+  if (offCenter >= tolerancePixels) return false;
+  return raycaster.checkVisibility(camera, sprite).visible;
+}
+```
+
+Two cheap, non-rendering calls — no need to render a frame or inspect
+pixels to answer "is the player aiming at this enemy."
+
+### Projectile-vs-wall collision (fast movers, no tunnelling)
+
+`checkVisibility(origin, target)` is already a **swept segment check**:
+it walks the DDA grid between the two points and tests every cell
+boundary crossed along the way, not just the segment's endpoint. That's
+exactly the property a fast-moving projectile needs — checking only
+where it *ends up* each frame can let it tunnel straight through a wall
+it crossed in between; walking the full segment can't miss a boundary
+that way, no matter how far the projectile travels in one step:
+
+```js
+function advanceProjectile(raycaster, projectile, dt) {
+  const next = {
+    x: projectile.x + projectile.vx * dt,
+    y: projectile.y + projectile.vy * dt,
+    z: projectile.z + projectile.vz * dt,
+  };
+  const result = raycaster.checkVisibility(projectile, next);
+  if (!result.visible) {
+    // Hit at result.hitX/result.hitY, result.hitDistance along the
+    // frame's travel, against result.cell -- spawn an impact effect,
+    // apply damage, remove the projectile, etc.
+    return { hit: true, ...result };
+  }
+  projectile.x = next.x;
+  projectile.y = next.y;
+  projectile.z = next.z;
+  return { hit: false };
+}
+```
+
+This already respects open `sections` correctly — a projectile passed
+through an open window won't register a false hit, the same as an AI's
+line of sight through one. Entity-vs-entity collision (hitting another
+player/enemy/projectile) is a separate concern for whatever system owns
+that state; this only ever answers "did the level's geometry block this
+segment."
+
+---
+
+## 11. Lifecycle
 
 ```js
 raycaster.resizeToCamera(); // call once after construction (and again if the Phaser canvas resizes)
@@ -325,7 +583,7 @@ new `Raycaster` to change levels.
 
 ---
 
-## 9. Minimal End-to-End Example
+## 12. Minimal End-to-End Example
 
 ```js
 import { Raycaster } from "./system/Raycaster.js";
@@ -369,7 +627,7 @@ export class MyState {
 
 ---
 
-## 10. Common Gotchas
+## 13. Common Gotchas
 
 - **World units vs. cell units.** Player/sprite/light coordinates are
   world units. Map/`getCell` lookups are cell units (`world / cellSize`).
@@ -386,6 +644,22 @@ export class MyState {
 - **Sprites/lights are not entities.** Don't hand the Raycaster ECS
   objects, Phaser sprites, or anything with identity/lifecycle — build a
   fresh plain-data array each frame from whatever owns that state.
-- **`blocking` and `wall` are independent.** Don't assume every wall
-  blocks movement, or that every non-blocking cell is empty — check
-  both if your feature cares about either.
+- **`blocking` and `wall`/`sections` are independent.** Don't assume
+  every wall blocks movement, or that every non-blocking cell is empty —
+  check both if your feature cares about either.
+- **`blocking` is whole-cell and coarse.** It doesn't know about gaps
+  between `sections` (a window, an overhang) — a collision system that
+  needs to reason about a specific gap must read `getCell(x, y).sections`
+  itself. The Raycaster intentionally has no opinion about whether a
+  given gap is walkable/passable.
+- **`setCellSections`/`setCellBlocking` key by cell id, not position.**
+  Every map tile sharing an id shares the exact same cell object — give
+  each door its own unique id, or mutating one will open every tile that
+  reuses that id.
+- **`checkVisibility()` never renders.** Don't call `render`/
+  `renderSnapshot` to answer "can this AI see that entity" — use
+  `checkVisibility()` directly; it's a pure geometry query and is
+  meaningfully cheaper. It also only checks wall `sections`, not floor/
+  ceiling occlusion, and ignores `blocking` (like `castRay()`) — a
+  non-blocking step's wall face still blocks sight if the line of sight
+  passes through its solid height range.

@@ -1,4 +1,36 @@
+import { Gameplay } from "./api/rules/Gameplay.js";
+import { SinglePlayerRules } from "./api/rules/SinglePlayerRules.js";
+import { User } from "./api/rules/User.js";
 import { Whiteroom } from "./level-whiteroom.js";
+import { SinglePlayerWhiteroom } from "./level-singleplayer-whiteroom.js";
+import { MultiplayerWhiteroom } from "./level-multiplayer-whiteroom.js";
+import { singlePlayerSession } from "./api/session/sessions.js";
+
+// const gameplay = new Gameplay({
+//   rules: new SinglePlayerRules({
+//     spawn: {
+//       x: 10,
+//       y: 10,
+//     },
+//   }),
+// });
+// const player = new User({
+//   id: "player-1",
+
+//   state: {
+//     health: 100,
+//     ammo: 20,
+//     inventory: {
+//       items: ["pistol"],
+//       equipped: "pistol",
+//     },
+//   },
+// });
+// gameplay.addPlayer(player);
+// gameplay.loadMap("e1m1");
+// gameplay.start();
+
+// BasicGame.gameplay = gameplay;
 
 BasicGame.Boot = function (game) {};
 
@@ -12,20 +44,31 @@ BasicGame.Boot.prototype = {
 
   preload: function () {
     this.load.spritesheet("Cobra", "assets/_ship_default.png", 32, 32);
-    this.load.spritesheet(
-      "defaultObject",
-      "assets/_default_object.png",
-      16,
-      16,
-    );
-    this.load.spritesheet("defaultPawn", "assets/_default_pawn.png", 16, 16);
+    this.load.image("wallTexture", "assets/textures/wall.png");
+
+    this.load.image("floorTexture", "assets/textures/floor.png");
+
+    this.load.image("ceilingTexture", "assets/textures/ceiling.png");
+
+    this.load.image("brickTexture", "assets/textures/brick.png");
+
+    this.load.image("skyTexture", "assets/textures/sky.png");
     this.load.image("pixelWhite", "assets/_pixel_white.png");
-    this.load.image("shipTurretDefault", "assets/_ship_turret_default.png");
-    this.load.image("defaultLight", "assets/_light_default.png");
-    this.load.image("starfield", "assets/_bg_nebula.png");
-    this.load.image("lightShip", "assets/_light_ship2.png");
-    this.load.image("testRoom", "assets/_test_room.png");
-    this.load.image("mountains", "assets/_bg_flat.png");
+    this.load.image("Plasma", "assets/projectiles/plasma.png");
+    this.load.image("health", "assets/items/health.png");
+    this.load.spritesheet(
+      "hudShotgun",
+      "assets/hud/item_shotgun.png",
+      130,
+      200,
+    );
+
+    this.load.spritesheet(
+      "hudDecoupler",
+      "assets/hud/item_plasma_decoupler.png",
+      130,
+      200,
+    );
 
     // this.load.image("dysonLight", "assets/_light_ship2.png");
   },
@@ -39,7 +82,10 @@ BasicGame.Boot.prototype = {
     // game.camera.roundPx = false; // stops the sprite from jittering.
     // game.camera.lerp = 0.5;
 
-    game.state.start("Whiteroom"); // Load the first level
+    // The session/spawning test level -- see level-singleplayer-whiteroom.js.
+    // "Whiteroom" (the pre-session state) is still registered below and
+    // reachable by starting it directly, kept as a rollback path.
+    game.state.start("SinglePlayerWhiteroom", true, false, singlePlayerSession);
   },
 };
 
@@ -63,6 +109,8 @@ BasicGame.Boot.prototype = {
 window.onload = function () {
   game.state.add("Boot", BasicGame.Boot);
   game.state.add("Whiteroom", Whiteroom);
+  game.state.add("SinglePlayerWhiteroom", SinglePlayerWhiteroom);
+  game.state.add("MultiplayerWhiteroom", MultiplayerWhiteroom);
   game.state.start("Boot");
 };
 

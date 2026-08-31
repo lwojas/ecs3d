@@ -1,145 +1,147 @@
 import { Raycaster } from "./system/Raycaster.js";
 import { testLevel } from "./data/3dtestLevel.js";
+import { componentDefaults } from "./data/SharedData.js";
+import { EntityManager } from "./services/EntityManager.js";
+import { PrefabFactory } from "./services/PrefabFactory.js";
+import { EventBus } from "./services/EventBus.js";
+import { MovementSystem } from "./system/MovementSystem.js";
+import { InputController } from "./system/InputController.js";
+import { resolveComponent } from "./tools/componentResolver.js";
+import {
+  runtimeBindings,
+  setAllBindings,
+  clearAllBindings,
+  registerUser,
+  getBindings,
+} from "./tools/runtimeBindings.js";
+import { CameraRenderer } from "./system/CameraRenderer.js";
+import { SpriteSystem } from "./system/SpriteSystem.js";
+import HUD from "./hud/hud.js";
+import { hudItems } from "./hud/hudData.js";
+import { ProjectileSystem } from "./system/Projectile/ProjectileSystem.js";
+import { CollisionSystem } from "./system/CollisionSystem.js";
+import { LightSystem } from "./system/LightSystem.js";
+// import { GameplaySystem } from "./system/GameplaySystem.js";
+import { ServiceLocator } from "./services/ServiceLocator.js";
+import { ECSBridge } from "./system/ECSBridge.js";
+import { InteractionSystem } from "./system/InteractionSystem.js";
+import { ItemSystem } from "./system/ItemSystem.js/ItemSystem.js";
+import { AISystem } from "./system/AISystem.js";
+import { CombatSystem } from "./system/CombatSystem.js";
 
 export class Whiteroom {
-  preload() {
-    this.load.image("wallTexture", "assets/textures/wall.png");
-
-    this.load.image("floorTexture", "assets/textures/floor.png");
-
-    this.load.image("ceilingTexture", "assets/textures/ceiling.png");
-
-    this.load.image("brickTexture", "assets/textures/brick.png");
-  }
+  preload() {}
 
   create() {
+    this.gameplayManager = ServiceLocator.resolve("system", "GameplayManager");
+    this.eventSystemGame = new EventBus("game");
+    this.entityManager = new EntityManager();
+
+    // Generate entities from Json
+    const prefabFactory = new PrefabFactory(this.entityManager, componentDefaults);
+    this.entities = testLevel.entities.map((entityData) =>
+      prefabFactory.createEntity(entityData),
+    );
+
+    // Initialise the raycaster
     this.raycaster = new Raycaster(this.game, testLevel, {
       width: 320,
       height: 180,
       debugSpriteAnchors: true,
       cellSize: 4,
-
-      wallHeight: 16,
+      wallHeight: 8,
       cameraHeight: 4,
-
       fov: Math.PI / 3,
-
       maxDistance: 1000,
     });
 
+    // For non-splite screen play
     this.raycaster.resizeToCamera();
 
-    this.player = {
-      x: 14,
-      y: 14,
-
-      angle: 0,
-
-      speed: 8,
-    };
-
-    // Renderer-facing billboard data. This is deliberately plain data rather
-    // than a Phaser sprite or ECS entity.
-    this.testSprites = [
-      {
-        x: 28,
-        y: 12,
-        z: 0,
-        width: 1,
-        height: 1,
-        scale: 16,
-        texture: "Cobra",
-      },
-    ];
-
-    // Renderer-facing lighting data (P8-02). Just as with sprites, this is
-    // plain per-frame data the Raycaster only turns into pixel brightness --
-    // it owns no light lifecycle. Stands in for a future ECS LightSystem.
-    this.testLights = [
-      {
-        x: 28,
-        y: 20,
-        z: 3,
-        radius: 20,
-        intensity: 1.5,
-        tint: { r: 255, g: 180, b: 120 },
-      },
-    ];
+    // Needs a home - this can be dynamic, time of day, fast switching, all possible
     this.ambient = 0.35;
 
-    this.keys = this.game.input.keyboard.addKeys({
-      forward: Phaser.Keyboard.W,
+    // Testing
+    this.hud = new HUD(game);
+    this.hud.items.registerAll(hudItems);
+    this.hud.items.equip("pistol");
 
-      backward: Phaser.Keyboard.S,
+    // For testing
+    this.player = resolveComponent("MovementComponent", this.entities[0]);
 
-      left: Phaser.Keyboard.A,
+    // Gameplay manager is persistent through Phaser states
+    // Example of allowing 1 or more local player instances
+    // Obviously nonsense here as player 2 would override.
 
-      right: Phaser.Keyboard.D,
+    this.ecs = new ECSBridge();
+
+    this.gameplayManager.players.forEach((user) => {
+      console.log(user.id);
+      registerUser(user.id);
+      this.cameraRenderer = new CameraRenderer(this.raycaster, user.id);
+      this.interactionSystem = new InteractionSystem(
+        this.hud,
+        this.gameplayManager,
+      );
+      this.inputController = new InputController(
+        user.id,
+        this.interactionSystem,
+      );
+      setAllBindings(user.id, this.player);
     });
+
+    this.movementSystem = new MovementSystem(this.raycaster, this.entities);
+    this.spriteSystem = new SpriteSystem(this.cameraRenderer);
+    this.collisionSystem = new CollisionSystem(this.cameraRenderer);
+    this.projectileSystem = new ProjectileSystem(
+      this.raycaster,
+      this.cameraRenderer,
+      this.collisionSystem,
+    );
+    this.combatSystem = new CombatSystem(
+      this.ecs,
+      this.collisionSystem.collisionEvents,
+    );
+    this.lightSystem = new LightSystem(this.cameraRenderer);
+    this.itemSystem = new ItemSystem(this.hud, this.projectileSystem);
+    this.interactionSystem.setItemSystem(this.itemSystem);
+    this.aiSystem = new AISystem(this.raycaster, this.itemSystem);
+
+    // Place hud above everything else in z order
+    this.hud.bringToTop();
+
+    // Test hud notification
+    this.hud.notify("Welcome to hell!");
   }
 
   update() {
-    const dt = this.game.time.elapsed / 1000;
+    // Current frame time
+    const delta = this.game.time.elapsed / 1000;
 
-    const player = this.player;
+    const ecs = this.ecs;
+    this.inputController.update(delta, ecs);
+    this.aiSystem.update(delta, ecs);
+    this.movementSystem.update(delta, ecs);
+    this.collisionSystem.update();
+    this.spriteSystem.update();
+    this.projectileSystem.update(delta);
+    this.combatSystem.update(ecs);
+    this.lightSystem.update();
+    this.cameraRenderer.update();
 
-    if (this.keys.left.isDown) {
-      player.angle -= 2.5 * dt;
-    }
+    // Example of just the gameplay manager consuming messages
+    const messages = this.ecs.consumeMessages();
+    this.gameplayManager.process(messages);
 
-    if (this.keys.right.isDown) {
-      player.angle += 2.5 * dt;
-    }
-
-    let moveX = 0;
-    let moveY = 0;
-
-    if (this.keys.forward.isDown) {
-      moveX += Math.cos(player.angle);
-
-      moveY += Math.sin(player.angle);
-    }
-
-    if (this.keys.backward.isDown) {
-      moveX -= Math.cos(player.angle);
-
-      moveY -= Math.sin(player.angle);
-    }
-
-    const length = Math.sqrt(moveX * moveX + moveY * moveY);
-
-    if (length > 0) {
-      moveX /= length;
-      moveY /= length;
-
-      const distance = player.speed * dt;
-
-      const nextX = player.x + moveX * distance;
-
-      const nextY = player.y + moveY * distance;
-
-      if (!this.raycaster.isWallWorld(nextX, player.y)) {
-        player.x = nextX;
-      }
-
-      if (!this.raycaster.isWallWorld(player.x, nextY)) {
-        player.y = nextY;
-      }
-    }
-
-    player.z = this.raycaster.getEyeHeightWorld(player.x, player.y);
-
-    const camera = this.raycaster.createCameraSnapshot(player);
-    camera.sprites = this.testSprites;
-    camera.lights = this.testLights;
-    camera.ambient = this.ambient;
-    this.raycaster.renderSnapshot(camera);
+    this.hud.setItemLighting(this.cameraRenderer.viewmodelLight);
   }
 
   shutdown() {
     if (this.raycaster) {
       this.raycaster.destroy();
+      this.gameplayManager = null;
       this.raycaster = null;
+      clearAllBindings();
     }
   }
 }

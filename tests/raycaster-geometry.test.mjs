@@ -123,6 +123,92 @@ function testWorldProjection() {
   assert.equal(raycaster.projectWorldZ(4, 0), 90);
 }
 
+// Regression test for a real shipped bug: a caller (ItemSystem's
+// fireFromCamera) fed a pixel/degree-scale "pitch" value straight into
+// Math.cos/sin as if it were radians, producing an erratic, wrapping
+// firing direction as the player looked up/down. getForwardVector() exists
+// specifically so gameplay callers have one correct, real-radians
+// implementation instead of reimplementing this trig inline.
+function testGetForwardVector() {
+  // Level aim (pitch 0), facing along +x: forward is exactly +x, no
+  // vertical component.
+  assertNear(Raycaster.getForwardVector(0, 0).x, 1);
+  assertNear(Raycaster.getForwardVector(0, 0).y, 0);
+  assertNear(Raycaster.getForwardVector(0, 0).z, 0);
+
+  // Facing along +y (angle = PI/2), still level.
+  assertNear(Raycaster.getForwardVector(Math.PI / 2, 0).x, 0);
+  assertNear(Raycaster.getForwardVector(Math.PI / 2, 0).y, 1);
+
+  // Looking straight up (pitch = PI/2): forward collapses to pure +z,
+  // regardless of horizontal angle.
+  const up = Raycaster.getForwardVector(0, Math.PI / 2);
+  assertNear(up.x, 0, 1e-9);
+  assertNear(up.z, 1);
+
+  // Looking straight down (pitch = -PI/2): pure -z.
+  const down = Raycaster.getForwardVector(0, -Math.PI / 2);
+  assertNear(down.z, -1);
+
+  // pitchRadians defaults to 0 (level aim) when omitted.
+  assert.deepEqual(
+    Raycaster.getForwardVector(1.2),
+    Raycaster.getForwardVector(1.2, 0),
+  );
+
+  // The result is always a unit vector.
+  const result = Raycaster.getForwardVector(0.7, 0.4);
+  assertNear(
+    Math.sqrt(result.x ** 2 + result.y ** 2 + result.z ** 2),
+    1,
+  );
+}
+
+// Regression test for a second, subtler version of the same bug: even
+// after routing through getForwardVector(), a caller (ItemSystem's
+// fireFromCamera) converted camera.pitch to radians via a fixed
+// degrees/radians factor. camera.pitch is not an angle at all -- it's a
+// screen-space horizon shift in pixels (see raycaster-api.md) -- so no
+// fixed conversion factor can match the rendered view; the true
+// equivalent angle depends on focalLength. getCameraForwardVector() is
+// the one authoritative place that conversion happens. The property this
+// test checks is the one that actually matters: a world point straight
+// ahead along the derived forward vector must project back to screen
+// centre, i.e. it points at exactly what the crosshair is showing.
+function testGetCameraForwardVector() {
+  const raycaster = createPureRaycaster();
+
+  const level = raycaster.getCameraForwardVector({ angle: 0, pitch: 0 });
+  assertNear(level.x, 1);
+  assertNear(level.y, 0);
+  assertNear(level.z, 0);
+
+  for (const pitchPixels of [10, -10, 80, -80, 150]) {
+    const camera = { angle: 0.3, pitch: pitchPixels };
+    const forward = raycaster.getCameraForwardVector(camera);
+
+    // projectWorldZ()'s `distance` parameter is a horizontal-plane
+    // distance (rays never carry a Z component in this renderer), so a
+    // 3D travel length along `forward` must be converted to the matching
+    // horizontal distance via the forward vector's own horizontal
+    // magnitude before calling it -- exactly mirroring how a caller would
+    // place a fired projectile some distance down its own trajectory.
+    const travel = 20;
+    const horizontalDistance = Math.hypot(forward.x, forward.y) * travel;
+    const worldZ = raycaster.cameraHeight + forward.z * travel;
+
+    // Mirrors what updateProjection(camera) would set for this camera.
+    raycaster.renderHorizon = raycaster.height / 2 + pitchPixels;
+    raycaster.renderCameraHeight = raycaster.cameraHeight;
+
+    assertNear(
+      raycaster.projectWorldZ(worldZ, horizontalDistance),
+      raycaster.height / 2,
+      1e-6,
+    );
+  }
+}
+
 function testConstructorDerivedProjection() {
   withFakeDom(() => {
     const game = createFakeGame();
@@ -396,6 +482,294 @@ function testFogRenderIntegration() {
   });
 }
 
+function testWallSectionsRenderIntegration() {
+  withFakeDom(() => {
+    const game = createFakeGame();
+    const camera = { x: 6, y: 6, z: 1, angle: 0, pitch: 0 };
+    const wallMaterial = { texture: "wallTexture", width: 4, height: 4 };
+    // Camera stands in cell 0 (x=1), facing down a corridor: a boundary
+    // cell (x=2) that's either one ordinary full-height wall or a
+    // "window" (two sections with a gap), then more open floor, then a
+    // far wall (x=5) that only a ray passing through the gap can reach.
+    const makeLevel = (windowed) => ({
+      width: 6,
+      height: 3,
+      map: ["111111", "102001", "111111"],
+      cells: {
+        0: {
+          floorHeight: 0,
+          ceilingHeight: 4,
+          floor: { texture: "floorTexture", width: 4, height: 4 },
+        },
+        1: { floorHeight: 0, ceilingHeight: 4, wall: wallMaterial },
+        // Sill/lintel heights are deliberately kept off `camera.z` (1) --
+        // renderPlane() treats a plane exactly at eye height as
+        // degenerate (zero visual extent) and skips it, which would
+        // silently no-op a cap and defeat the point of this test.
+        2: windowed
+          ? {
+              floorHeight: 0,
+              ceilingHeight: 4,
+              sections: [
+                { bottom: 0, top: 0.5, material: wallMaterial },
+                { bottom: 3, top: 4, material: wallMaterial },
+              ],
+            }
+          : { floorHeight: 0, ceilingHeight: 4, wall: wallMaterial },
+      },
+    });
+    const options = {
+      width: 40,
+      height: 30,
+      cellSize: 4,
+      cameraHeight: 1,
+      debug: true,
+    };
+
+    const solidRaycaster = new Raycaster(game, makeLevel(false), options);
+    solidRaycaster.renderSnapshot(camera);
+    const solidStats = solidRaycaster.getDebugStats();
+    const solidFrame = Uint8ClampedArray.from(solidRaycaster.imageData.data);
+
+    const windowedRaycaster = new Raycaster(game, makeLevel(true), options);
+    windowedRaycaster.renderSnapshot(camera);
+    const windowedStats = windowedRaycaster.getDebugStats();
+    const windowedFrame = Uint8ClampedArray.from(
+      windowedRaycaster.imageData.data,
+    );
+
+    // A solid boundary closes the column immediately: nothing behind it
+    // (the far wall at x=5) is ever reached or drawn.
+    assert.equal(solidStats.wallSegments, 40); // one section, one per column
+    // The windowed boundary draws its own two sections, *and* leaves the
+    // gap open long enough for the ray to reach and draw the far wall --
+    // strictly more wall-drawing work than the solid case, in exactly the
+    // way "a gap reveals what's behind it" predicts. (Not asserting on
+    // wallPixels: two short sections can legitimately span fewer total
+    // rows than one full-height wall, so that count isn't a reliable
+    // proxy here -- wallSegments and the cap-driven plane count are.)
+    assert.ok(windowedStats.wallSegments > solidStats.wallSegments);
+    assert.ok(windowedStats.planePixelsDrawn > solidStats.planePixelsDrawn);
+
+    // The rendered frames must actually differ -- the gap isn't just
+    // counted internally, it's visible.
+    assert.notDeepEqual(windowedFrame, solidFrame);
+  });
+}
+
+function testSectionCapsRenderIntegration() {
+  withFakeDom(() => {
+    const game = createFakeGame();
+    const camera = { x: 6, y: 6, z: 1.5, angle: 0, pitch: 0 };
+    const wallMaterial = { texture: "wallTexture", width: 4, height: 4 };
+    // The window is the *last* cell the ray can reach (map ends right
+    // after it), so nothing is ever visible "through" the gap -- any
+    // extra plane drawing between the solid and windowed variants can
+    // only come from the sill's top / lintel's underside cap faces
+    // themselves, isolating exactly the bug being fixed here.
+    const makeLevel = (windowed) => ({
+      width: 3,
+      height: 3,
+      map: ["111", "102", "111"],
+      cells: {
+        0: { floorHeight: 0, ceilingHeight: 4 },
+        2: windowed
+          ? {
+              floorHeight: 0,
+              ceilingHeight: 4,
+              sections: [
+                { bottom: 0, top: 0.5, material: wallMaterial },
+                { bottom: 3, top: 4, material: wallMaterial },
+              ],
+            }
+          : { floorHeight: 0, ceilingHeight: 4, wall: wallMaterial },
+      },
+    });
+    const options = {
+      width: 40,
+      height: 30,
+      cellSize: 4,
+      cameraHeight: 1.5,
+      debug: true,
+    };
+
+    const solidRaycaster = new Raycaster(game, makeLevel(false), options);
+    solidRaycaster.renderSnapshot(camera);
+    const solidStats = solidRaycaster.getDebugStats();
+
+    const windowedRaycaster = new Raycaster(game, makeLevel(true), options);
+    windowedRaycaster.renderSnapshot(camera);
+    const windowedStats = windowedRaycaster.getDebugStats();
+
+    // The solid wall has no caps to draw at all.
+    assert.equal(solidStats.planePixelsDrawn, 0);
+    // The windowed boundary must draw its sill's top and lintel's
+    // underside, with nothing else in the scene able to account for it.
+    assert.ok(windowedStats.planePixelsDrawn > 0);
+  });
+}
+
+function testSkyConstructorLoading() {
+  withFakeDom(() => {
+    const game = createFakeGame();
+    const level = {
+      width: 3,
+      height: 3,
+      map: ["111", "101", "111"],
+      cells: {
+        0: { floorHeight: 0, ceilingHeight: 4 },
+        1: { floorHeight: 0, ceilingHeight: 4, wall: { texture: "wallTexture", width: 4, height: 4 } },
+      },
+    };
+    const options = { width: 20, height: 20, cellSize: 4, cameraHeight: 1 };
+
+    // No level.sky: the default flat-colour background path, no sky loaded.
+    const noSky = new Raycaster(game, level, options);
+    assert.equal(noSky.sky, null);
+
+    // level.sky loads through the same surface pipeline as wall/floor/
+    // ceiling materials -- same caching, same decode path.
+    const withSky = new Raycaster(
+      game,
+      { ...level, sky: { texture: "skyTexture" } },
+      options,
+    );
+    assert.ok(withSky.sky);
+    assert.equal(withSky.sky.textureKey, "skyTexture");
+    assert.ok(withSky.sky.widthPixels > 0);
+  });
+}
+
+function testFillFlatSky() {
+  const raycaster = createPureRaycaster({ width: 4, height: 6 });
+  const pixels = new Uint8ClampedArray(4 * 6 * 4);
+  const sky = Raycaster.DEFAULT_FOG_COLOR;
+
+  raycaster.fillFlatSky(pixels, 3);
+
+  for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < 4; x++) {
+      const i = (y * 4 + x) * 4;
+      assert.equal(pixels[i], sky.r);
+      assert.equal(pixels[i + 1], sky.g);
+      assert.equal(pixels[i + 2], sky.b);
+      assert.equal(pixels[i + 3], 255);
+    }
+  }
+  // Untouched below skyRows -- left for floor/ceiling rendering (or, if
+  // neither is present, to stay transparent) rather than assumed sky.
+  for (let y = 3; y < 6; y++) {
+    for (let x = 0; x < 4; x++) {
+      const i = (y * 4 + x) * 4;
+      assert.equal(pixels[i + 3], 0);
+    }
+  }
+
+  // skyRows can reach the full screen height -- this is exactly what
+  // fixes the pitch-cutoff bug: the fill is never capped at a fixed
+  // half of the screen, only at whatever the caller (renderSnapshot(),
+  // driven by the current renderHorizon) asks for.
+  const full = new Uint8ClampedArray(4 * 6 * 4);
+  raycaster.fillFlatSky(full, 6);
+  for (let i = 3; i < full.length; i += 4) assert.equal(full[i], 255);
+}
+
+function testRenderSkyFollowsAngleNotPosition() {
+  // A 4-pixel-wide fake sky texture with a distinct red channel per
+  // column, so sampling a different textureX is directly observable.
+  const sky = {
+    widthPixels: 4,
+    heightPixels: 2,
+    pixels: (() => {
+      const data = new Uint8ClampedArray(4 * 2 * 4);
+      for (let x = 0; x < 4; x++) {
+        for (let y = 0; y < 2; y++) {
+          const i = (y * 4 + x) * 4;
+          data[i] = x * 85; // 0, 85, 170, 255
+          data[i + 1] = 0;
+          data[i + 2] = 0;
+          data[i + 3] = 255;
+        }
+      }
+      return data;
+    })(),
+  };
+  const raycaster = createPureRaycaster({
+    width: 4,
+    height: 4,
+    sky,
+    skyRowScratch: new Int32Array(4),
+    // Every column looks exactly along camera.angle (no per-column
+    // spread), isolating the mapping down to angle alone.
+    columnGeometry: [0, 1, 2, 3].map(() => ({ angleOffset: 0 })),
+  });
+
+  const sampleRedAt = (camera) => {
+    const pixels = new Uint8ClampedArray(4 * 4 * 4);
+    raycaster.renderSky(pixels, camera, 4);
+    return pixels[0]; // row 0, column 0, red channel
+  };
+
+  const facingRight = sampleRedAt({ x: 0, y: 0, angle: 0 });
+  // Moving (x/y change) with the same angle must not change the sky at
+  // all -- this is the "player movement does not affect it" requirement.
+  const movedSamePosition = sampleRedAt({ x: 500, y: -500, angle: 0 });
+  assert.equal(movedSamePosition, facingRight);
+
+  // Turning (angle change) with the same position must change it --
+  // "horizontal texture position follows the camera angle."
+  const turned = sampleRedAt({ x: 0, y: 0, angle: Math.PI / 2 });
+  assert.notEqual(turned, facingRight);
+  assert.equal(turned, 1 * 85); // quarter turn -> texture column 1 of 4
+}
+
+function testSkyTracksPitchEndToEnd() {
+  withFakeDom(() => {
+    const game = createFakeGame();
+    // No floor/ceiling surfaces and maxDistance short enough that no
+    // wall is ever reached -- the only thing that can appear anywhere
+    // on screen is the sky/background fill, isolating the pitch-cutoff
+    // fix from any interaction with floor/wall rendering.
+    const level = {
+      width: 3,
+      height: 3,
+      map: ["111", "101", "111"],
+      cells: {
+        0: { floorHeight: -50, ceilingHeight: 50 },
+        1: { floorHeight: -50, ceilingHeight: 50, wall: { texture: "wallTexture", width: 4, height: 4 } },
+      },
+    };
+    // maxDistance is a *raycaster* option, not level data -- kept short
+    // enough that the boundary wall (2 world units away) is never
+    // reached, so it can't dominate/mask the background being tested.
+    const raycaster = new Raycaster(game, level, {
+      width: 10,
+      height: 40,
+      cellSize: 4,
+      cameraHeight: 1,
+      maxDistance: 0.1,
+    });
+    const camera = { x: 6, y: 6, angle: 0 };
+    // Row well past the old fixed height/2 (=20) split that used to cap
+    // the background regardless of pitch.
+    const probeRow = 35;
+    const sampleAlpha = (pitch) => {
+      raycaster.renderSnapshot({ ...camera, pitch });
+      const index = (probeRow * raycaster.width + 5) * 4 + 3;
+      return raycaster.imageData.data[index];
+    };
+
+    // At zero pitch, row 35 is well below the horizon and untouched by
+    // sky (and there's no floor surface to draw there either).
+    assert.equal(sampleAlpha(0), 0);
+    // Enough pitch pushes renderHorizon (and therefore skyRows) past
+    // row 35, which must now be sky -- this is the reported bug: the
+    // old static half-screen background never reached this far no
+    // matter how far the camera pitched.
+    assert.equal(sampleAlpha(100), 255);
+  });
+}
+
 function testFisheyeCorrection() {
   const raycaster = createPureRaycaster();
   const distance = 12;
@@ -420,8 +794,11 @@ function testDdaSegments() {
       map: ["11111", "10001", "11111"],
     },
     cells: {
-      0: { wall: null },
-      1: { wall: { textureKey: "wall" } },
+      0: { wall: null, sections: [] },
+      1: {
+        wall: { textureKey: "wall" },
+        sections: [{ bottom: 0, top: 1, material: { textureKey: "wall" } }],
+      },
     },
   });
   raycaster.map = raycaster.normaliseMap(raycaster.level.map);
@@ -558,6 +935,7 @@ function testLevelNormalisation() {
     floorHeight: 2,
     ceilingHeight: 9,
     wall: null,
+    sections: [],
     floor: null,
     ceiling: null,
     blocking: false,
@@ -569,6 +947,8 @@ function testLevelNormalisation() {
       floorHeight: 1,
       ceilingHeight: 9,
       wall: "brick",
+      // A plain `wall` is sugar for one section spanning the whole cell.
+      sections: [{ bottom: 1, top: 9, material: "brick" }],
       floor: null,
       ceiling: null,
       // A wall blocks by default when `blocking` is not set explicitly.
@@ -582,6 +962,7 @@ function testLevelNormalisation() {
       floorHeight: 2,
       ceilingHeight: 9,
       wall: "brick",
+      sections: [{ bottom: 2, top: 9, material: "brick" }],
       floor: null,
       ceiling: null,
       // Explicit override: a walled cell that does not block, i.e. a step.
@@ -589,6 +970,36 @@ function testLevelNormalisation() {
       fog: null,
     },
   );
+
+  // Explicit `sections` describe independent vertical bands (windows,
+  // arches, railings, overhangs) on the same boundary; `sections` wins
+  // over `wall` if both are given, and each section's own bottom/top
+  // default from the cell's floor/ceiling height.
+  assert.deepEqual(
+    raycaster.normaliseCellDefinition({
+      wall: "ignored-when-sections-given",
+      sections: [
+        { bottom: 0, top: 1, material: "brick" },
+        { top: 2.5, material: "brick" }, // bottom defaults to floorHeight
+      ],
+    }).sections,
+    [
+      { bottom: 0, top: 1, material: "brick" },
+      { bottom: 2, top: 2.5, material: "brick" },
+    ],
+  );
+  // A cell with no wall and no sections has an empty, non-blocking
+  // boundary -- an open cell.
+  assert.deepEqual(raycaster.normaliseCellDefinition({ sections: [] }), {
+    floorHeight: 2,
+    ceilingHeight: 9,
+    wall: null,
+    sections: [],
+    floor: null,
+    ceiling: null,
+    blocking: false,
+    fog: null,
+  });
 
   // `fog: true` is shorthand for the built-in defaults.
   assert.deepEqual(raycaster.normaliseCellDefinition({ fog: true }).fog, {
@@ -818,6 +1229,7 @@ function testStepCollision() {
       floorHeight: 0,
       ceilingHeight: 0.5,
       wall: { textureKey: "step" },
+      sections: [{ bottom: 0, top: 0.5, material: { textureKey: "step" } }],
       blocking: false,
     },
   };
@@ -841,14 +1253,224 @@ function testStepCollision() {
   assertNear(raycaster.getEyeHeightWorld(10, 6), raycaster.cameraHeight);
 }
 
+function createVisibilityFixture() {
+  const wallMaterial = { textureKey: "wall" };
+  // index: 0='1' boundary, 1='0' open, 2='1' interior full wall (same
+  // definition as the boundary, just placed away from the map edge),
+  // 3='0' open, 4='2' window, 5='0' open, 6='1' boundary. This keeps the
+  // full-wall crossing (mapX 1->3) and the window crossing (mapX 3->5)
+  // on disjoint stretches of the corridor so each test below exercises
+  // exactly one of them.
+  return createSegmentFixture(["1111111", "1010201", "1111111"], {
+    0: { floorHeight: 0, ceilingHeight: 4 },
+    1: {
+      floorHeight: 0,
+      ceilingHeight: 4,
+      sections: [{ bottom: 0, top: 4, material: wallMaterial }],
+    },
+    // A window: solid sill/lintel with a gap from height 1 to 3.
+    2: {
+      floorHeight: 0,
+      ceilingHeight: 4,
+      sections: [
+        { bottom: 0, top: 1, material: wallMaterial },
+        { bottom: 3, top: 4, material: wallMaterial },
+      ],
+    },
+  });
+}
+
+function testCheckVisibility() {
+  const raycaster = createVisibilityFixture();
+
+  // Clear line of sight through the window's open gap (mapX 3 -> 5).
+  const throughGap = raycaster.checkVisibility(
+    { x: 14, y: 6, z: 2 },
+    { x: 22, y: 6, z: 2 },
+  );
+  assert.equal(throughGap.visible, true);
+  assertNear(throughGap.distance, 8);
+  assert.equal(throughGap.hitDistance, null);
+  assert.equal(throughGap.cell, null);
+
+  // Same straight line, but at a height inside the window's solid sill:
+  // the open section elsewhere on the same boundary must not matter --
+  // only whether *this* height is covered by a section.
+  const throughSill = raycaster.checkVisibility(
+    { x: 14, y: 6, z: 0.5 },
+    { x: 22, y: 6, z: 0.5 },
+  );
+  assert.equal(throughSill.visible, false);
+  assertNear(throughSill.distance, 8);
+  assert.ok(throughSill.hitDistance > 0 && throughSill.hitDistance < 8);
+  assert.equal(throughSill.mapX, 4);
+  assert.equal(throughSill.mapY, 1);
+  assert.ok(throughSill.cell.sections.length > 0);
+
+  // An interior full-height wall (mapX 1 -> 3) blocks regardless of
+  // height, well before either endpoint reaches the window.
+  const throughWall = raycaster.checkVisibility(
+    { x: 6, y: 6, z: 2 },
+    { x: 14, y: 6, z: 2 },
+  );
+  assert.equal(throughWall.visible, false);
+  assert.equal(throughWall.mapX, 2);
+
+  // Same XY position, different Z: no grid boundary can block a purely
+  // vertical line of sight.
+  const vertical = raycaster.checkVisibility(
+    { x: 6, y: 6, z: 0 },
+    { x: 6, y: 6, z: 5 },
+  );
+  assert.equal(vertical.visible, true);
+  assertNear(vertical.distance, 5);
+
+  // z defaults to 0 when omitted, matching sprites/lights -- height 0 is
+  // within the window's sill.
+  const defaultZ = raycaster.checkVisibility(
+    { x: 14, y: 6 },
+    { x: 22, y: 6 },
+  );
+  assert.equal(defaultZ.visible, false);
+}
+
+function testSetCellBlocking() {
+  const raycaster = createSegmentFixture(["111", "101", "111"], {
+    0: { floorHeight: 0, ceilingHeight: 4 },
+    1: {
+      floorHeight: 0,
+      ceilingHeight: 4,
+      sections: [{ bottom: 0, top: 4, material: {} }],
+      blocking: true,
+    },
+  });
+
+  assert.equal(raycaster.isWall(0, 1), true);
+
+  const opened = raycaster.setCellBlocking(1, false);
+  assert.ok(opened);
+  assert.equal(raycaster.isWall(0, 1), false);
+
+  raycaster.setCellBlocking(1, true);
+  assert.equal(raycaster.isWall(0, 1), true);
+
+  // Unknown id: warns and returns null rather than throwing.
+  assert.equal(raycaster.setCellBlocking("missing", false), null);
+}
+
+function testSetCellSections() {
+  withFakeDom(() => {
+    const raycaster = createPureRaycaster({
+      game: createFakeGame(),
+      materialCache: Object.create(null),
+      materialCacheHits: 0,
+      materialCacheMisses: 0,
+      level: { materials: {} },
+      cells: {
+        1: { floorHeight: 0, ceilingHeight: 4, sections: [], blocking: true },
+      },
+    });
+
+    const wall = { texture: "wallTexture", width: 4, height: 4 };
+    const updated = raycaster.setCellSections(1, [
+      { bottom: 1, material: wall }, // top omitted -> defaults to ceilingHeight
+      { top: 3, material: wall }, // bottom omitted -> defaults to floorHeight
+    ]);
+
+    assert.ok(updated);
+    // Sorted by bottom (0 before 1), and heights defaulted from the
+    // cell's own floorHeight/ceilingHeight -- same rules
+    // normaliseCellDefinition() applies at level-load time.
+    assert.deepEqual(
+      updated.sections.map((s) => [s.bottom, s.top]),
+      [
+        [0, 3],
+        [1, 4],
+      ],
+    );
+    // `material` was resolved through the real loadSurface() pipeline,
+    // not left as the raw {texture, width, height} definition.
+    assert.equal(updated.sections[0].material.textureKey, "wallTexture");
+    assert.ok(updated.sections[0].material.widthPixels > 0);
+
+    // Unknown id: warns and returns null rather than throwing.
+    assert.equal(raycaster.setCellSections("missing", []), null);
+  });
+}
+
+function testDoorRuntimeMutation() {
+  withFakeDom(() => {
+    const game = createFakeGame();
+    const wallMaterial = { texture: "wallTexture", width: 4, height: 4 };
+    // Cell "2" is the door: a normal full-height wall until it's opened
+    // at runtime via setCellSections()/setCellBlocking().
+    const level = {
+      width: 6,
+      height: 3,
+      map: ["111111", "100201", "111111"],
+      cells: {
+        0: {
+          floorHeight: 0,
+          ceilingHeight: 4,
+          floor: { texture: "floorTexture", width: 4, height: 4 },
+        },
+        1: { floorHeight: 0, ceilingHeight: 4, wall: wallMaterial },
+        2: {
+          floorHeight: 0,
+          ceilingHeight: 4,
+          wall: wallMaterial,
+          blocking: true,
+        },
+      },
+    };
+    const raycaster = new Raycaster(game, level, {
+      width: 40,
+      height: 30,
+      cellSize: 4,
+      cameraHeight: 1,
+    });
+    const camera = { x: 6, y: 6, z: 1, angle: 0, pitch: 0 };
+    const sightline = [
+      { x: 6, y: 6, z: 2 },
+      { x: 18, y: 6, z: 2 },
+    ];
+
+    // Closed: blocks movement and sight, renders as a solid wall.
+    assert.equal(raycaster.isWallWorld(14, 6), true);
+    assert.equal(raycaster.checkVisibility(...sightline).visible, false);
+    raycaster.renderSnapshot(camera);
+    const closedFrame = Uint8ClampedArray.from(raycaster.imageData.data);
+
+    // Open the door at runtime -- same instance, no re-render or "apply"
+    // step beyond the setters themselves.
+    raycaster.setCellSections("2", []);
+    raycaster.setCellBlocking("2", false);
+
+    assert.equal(raycaster.isWallWorld(14, 6), false);
+    assert.equal(raycaster.checkVisibility(...sightline).visible, true);
+    raycaster.renderSnapshot(camera);
+    const openFrame = Uint8ClampedArray.from(raycaster.imageData.data);
+
+    assert.notDeepEqual(openFrame, closedFrame);
+  });
+}
+
 const tests = [
   ["world-Z projection", testWorldProjection],
+  ["get forward vector", testGetForwardVector],
+  ["get camera forward vector matches rendered view", testGetCameraForwardVector],
   ["constructor-derived projection", testConstructorDerivedProjection],
   ["light resolution", testLightResolution],
   ["light sampling", testLightSampling],
   ["lighting render integration", testLightingRenderIntegration],
   ["fog blend", testFogBlend],
   ["fog render integration", testFogRenderIntegration],
+  ["wall sections render integration", testWallSectionsRenderIntegration],
+  ["section caps render integration", testSectionCapsRenderIntegration],
+  ["sky constructor loading", testSkyConstructorLoading],
+  ["fill flat sky", testFillFlatSky],
+  ["render sky follows angle not position", testRenderSkyFollowsAngleNotPosition],
+  ["sky tracks pitch end to end", testSkyTracksPitchEndToEnd],
   ["fisheye correction", testFisheyeCorrection],
   ["DDA segments", testDdaSegments],
   ["plane distance", testPlaneDistance],
@@ -865,6 +1487,10 @@ const tests = [
   ["open-ceiling fixture", testOpenCeilingFixture],
   ["multi-cell corridor fixture", testMultiCellCorridorFixture],
   ["step collision", testStepCollision],
+  ["check visibility", testCheckVisibility],
+  ["set cell blocking", testSetCellBlocking],
+  ["set cell sections", testSetCellSections],
+  ["door runtime mutation", testDoorRuntimeMutation],
 ];
 
 for (const [name, test] of tests) {

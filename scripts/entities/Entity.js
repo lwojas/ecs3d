@@ -13,28 +13,36 @@ export class Entity {
     this.entityManager = ServiceLocator.resolve("game", "EntityManager");
   }
 
+  disable() {
+    for (let componentName in this.components) {
+      const component = this.components[componentName];
+      console.log(component);
+      if (component.enabled) {
+        component.enabled = false;
+      }
+    }
+  }
+
+  // Symmetric to disable() -- used by EntitySpawner.respawn() to bring a
+  // dead entity's components back to life without reconstructing it.
+  enable() {
+    for (let componentName in this.components) {
+      const component = this.components[componentName];
+      if (!component.enabled) {
+        component.enabled = true;
+      }
+    }
+  }
+
   addComponent(component, componentData) {
-    // let spriteExists = false;
     // Remove a previous version of this component
     if (this.components[component.constructor.name]) {
-      // Special sauce for existing sprites
-      // if (component.constructor.name === "SpriteComponent") {
-      //   spriteExists = true;
-      //   // Record the last known position of the sprite
-      //   let position = this.getComponent("Position");
-      //   position.x = this.getComponent("SpriteComponent").sprite.world.x;
-      //   position.y = this.getComponent("SpriteComponent").sprite.world.y;
-      // }
       delete this.components[component.constructor.name];
     }
     this.snapshot[component.constructor.name] = componentData;
     this.components[component.constructor.name] = component;
     this.components[component.constructor.name].entity = this;
 
-    // if (spriteExists) {
-    //   console.log("Init entity");
-    //   this.entityManager.initManager.initEntity(this);
-    // }
     this.entityManager.updateEntityLists(this);
   }
 
