@@ -43,7 +43,7 @@ export class Entity {
     this.components[component.constructor.name] = component;
     this.components[component.constructor.name].entity = this;
 
-    this.entityManager.updateEntityLists(this);
+    // this.entityManager.updateEntityLists(this);
   }
 
   getComponent(name) {

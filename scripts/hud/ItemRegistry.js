@@ -84,6 +84,9 @@ export default class ItemRegistry {
   }
 
   equip(id) {
+    if (this.equippedId === id) {
+      return true;
+    }
     const item = this.items[id];
 
     if (!item) {
@@ -212,7 +215,7 @@ export default class ItemRegistry {
 
     // Phaser CE can destroy a tween when it is manually
     // stopped. Keep it reusable.
-    this.bobTween._destroyOnComplete = false;
+    // this.bobTween._destroyOnComplete = false;
 
     this.bobActive = false;
   }

@@ -7,12 +7,16 @@ export class SpriteSystem extends System {
     this.entities = this.entityManager.registerSystem(this, [
       "SpriteComponent",
     ]);
+    this.refreshList();
+    this.renderList = cameraRenderer.sprites;
+  }
+
+  refreshList() {
     this.componentList = resolveComponentList("SpriteComponent", this.entities);
     this.movementList = resolveComponentList(
       "MovementComponent",
       this.entities,
     );
-    this.renderList = cameraRenderer.sprites;
   }
 
   update() {

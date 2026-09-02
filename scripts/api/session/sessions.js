@@ -1,5 +1,5 @@
-import { testMap } from "../../data/testMap.js";
-import { testEntities } from "../../data/testEntities.js";
+import { maps } from "../../data/maps/index.js";
+import { entityDatasets } from "../../data/entities/index.js";
 
 // The contract a future main-menu configurator will eventually produce.
 // `map`/`entities` are string keys (not live object references) so this
@@ -39,13 +39,12 @@ import { testEntities } from "../../data/testEntities.js";
 //                    sees these. Precedence (later overrides earlier,
 //                    not cumulative): modifiers -> player.modifiers ->
 //                    botModifiers. See GameSession.buildWorld().
-const maps = {
-  testMap,
-};
-
-const entityDatasets = {
-  testEntities,
-};
+//
+// `maps`/`entityDatasets` are generated registries, not hand-maintained
+// here -- one entry per JSON file the editor writes to scripts/data/maps
+// and scripts/data/entities. Run `npm run data:build` (or `npm start`,
+// which runs it automatically) after adding/editing one; see
+// tools/build-data.js.
 
 // Accepts either a registered string key or already-resolved data
 // passed straight through (used by tests to exercise GameSession without
@@ -67,6 +66,17 @@ export function resolveEntityData(nameOrData) {
     throw new Error(`Unknown entity dataset: "${nameOrData}"`);
   }
   return entities;
+}
+
+// The registered keys, for anything that needs to *list* what's
+// available (e.g. the HTML menu's map/entities selects) without loading
+// or duplicating the underlying data.
+export function getAvailableMaps() {
+  return Object.keys(maps);
+}
+
+export function getAvailableEntityDatasets() {
+  return Object.keys(entityDatasets);
 }
 
 // A bot is a player controlled by AI -- not a separate population.
@@ -106,7 +116,7 @@ export function resolveSessionPlayers(session) {
 function createTestPlayerState() {
   return {
     health: 100,
-    ammo: 20,
+    // ammo: 20, Not used see resources below
     inventory: {
       items: ["pistol", "shotgun"],
       equipped: "shotgun",
@@ -155,7 +165,10 @@ export const coopWaveSession = {
   entities: "testEntities",
   players: [{ id: "player-1", name: "Player", state: createTestPlayerState() }],
   rules: {
-    waves: [{ prefab: "enemy", count: 3, spawnZone: "courtyard" }],
+    // No spawnZone here -- WaveRules decides that for itself at spawn
+    // time (defaults to its own "courtyard" convention, which happens to
+    // match this map; see WaveRules.js).
+    waves: [{ prefab: "enemy", count: 3 }],
   },
 };
 

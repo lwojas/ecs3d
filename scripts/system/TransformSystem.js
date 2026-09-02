@@ -7,12 +7,17 @@ export class TransformSystem extends System {
     this.entities = this.entityManager.registerSystem(this, [
       "TransformComponent",
     ]);
+    this.refreshList();
+  }
+
+  refreshList() {
     this.transformList = resolveComponentList(
       "TransformComponent",
       this.entities,
     );
     this.spriteList = resolveComponentList("SpriteComponent", this.entities);
   }
+
   update(delta) {
     // const delta = game.time.now;
     // console.log(this.entities);

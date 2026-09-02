@@ -7,6 +7,7 @@ export class EntityManager {
 
     this.world = [];
     this.worldHash = new Map();
+    this.byId = new Map();
     this.entities = new Set();
     this.systemEntityLists = new Map();
     this.isBatching = false; // Flag to delay updates
@@ -23,39 +24,62 @@ export class EntityManager {
     // console.log(entity);
     this.world.push(entity);
     this.worldHash.set(entity, this.world.length - 1);
+    if (entity.id != null) this.byId.set(entity.id, entity);
+    this.updateEntityLists(entity);
   }
 
   removeEntity(entity) {
     this.world.splice(this.worldHash.get(entity));
     this.worldHash.delete(entity);
+    if (entity.id != null) this.byId.delete(entity.id);
+  }
+
+  // The one authoritative id-keyed lookup -- every entity, however it was
+  // created (authored, player, bot, or dynamically spawned by a GameRules
+  // subclass), passes through addEntity() above the same way, so this
+  // finds all of them uniformly. Callers (MapWorld, respawn/inspection
+  // tooling, ...) should use this instead of keeping their own id map.
+  getEntity(id) {
+    return this.byId.get(id) ?? null;
   }
 
   updateEntityLists(entity) {
     for (let [system, entityList] of this.systemEntityLists.entries()) {
-      // console.log(system);
-      const newList = [];
-      this.world.forEach((worldEnity) => {
-        const requiredComponents = system.requiredComponents;
-        const hasAllComponents = requiredComponents.every((comp) =>
-          worldEnity.hasComponent(comp),
-        );
-        if (hasAllComponents) {
-          if (worldEnity.isEnabled) {
-            newList.push(worldEnity);
-          }
+      const entityComponents = Object.keys(entity.components);
+      const hasAllComponents = system.requiredComponents.every((comp) =>
+        entityComponents.includes(comp),
+      );
+
+      if (hasAllComponents && entity.isEnabled) {
+        if (!entityList.includes(entity)) {
+          entityList.push(entity);
         }
-      });
-      system.componentLists = {};
-      system.requiredComponents.forEach((component) => {
-        system.componentLists[component] = this.makeComponentList(
-          newList,
-          component,
-        );
-      });
-      system.actors = this.makeSpriteList(newList);
-      system.cachedComponents = this.makeComponentList(newList);
-      system.entities = newList;
-      entityList = newList;
+      }
+      // console.log(system, entityList);
+
+      // const newList = [];
+      // this.world.forEach((worldEnity) => {
+      //   const requiredComponents = system.requiredComponents;
+      //   const hasAllComponents = requiredComponents.every((comp) =>
+      //     worldEnity.hasComponent(comp),
+      //   );
+      //   if (hasAllComponents) {
+      //     if (worldEnity.isEnabled) {
+      //       newList.push(worldEnity);
+      //     }
+      //   }
+      // });
+      // system.componentLists = {};
+      // system.requiredComponents.forEach((component) => {
+      //   system.componentLists[component] = this.makeComponentList(
+      //     newList,
+      //     component,
+      //   );
+      // });
+      // // system.actors = this.makeSpriteList(newList);
+      // system.cachedComponents = this.makeComponentList(newList);
+      // system.entities = newList;
+      // entityList = newList;
       if (system.refreshList) system.refreshList();
     }
   }
@@ -68,16 +92,16 @@ export class EntityManager {
         (comp) => entity.hasComponent(comp) && entity.isEnabled,
       ),
     );
-    requiredComponents.forEach((component) => {
-      if (!system.componentLists) system.componentLists = {};
-      system.componentLists[component] = this.makeComponentList(
-        filteredEntities,
-        component,
-      );
-    });
+    // requiredComponents.forEach((component) => {
+    //   if (!system.componentLists) system.componentLists = {};
+    //   system.componentLists[component] = this.makeComponentList(
+    //     filteredEntities,
+    //     component,
+    //   );
+    // });
 
     this.systemEntityLists.set(system, filteredEntities);
-    system.actors = this.makeSpriteList(filteredEntities);
+    // system.actors = this.makeSpriteList(filteredEntities);
 
     return filteredEntities;
   }

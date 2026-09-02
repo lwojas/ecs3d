@@ -7,11 +7,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:raycaster": "node tests/raycaster-geometry.test.mjs",
-    "test:gameplay": "node tests/gameplay-rules.test.mjs",
     "test:spawning": "node tests/entity-spawning.test.mjs",
     "test:session": "node tests/game-session.test.mjs",
+    "test:lifecycle": "node tests/session-lifecycle.test.mjs",
     "test:inventory": "node tests/inventory.test.mjs",
     "test:trigger": "node tests/trigger.test.mjs",
+    "data:build": "node tools/build-data.js",
+    "prestart": "npm run data:build",
     "start": "lite-server"
   },
   "author": "",

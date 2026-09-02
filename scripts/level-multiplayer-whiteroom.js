@@ -1,32 +1,39 @@
-// Multiplayer/bots host for the session architecture (Case C). Hosts a
-// GameSession -- it doesn't spawn players or bots itself; GameSession
-// reads session.players/session.botCount and does that generically for
-// any session, via the same EntitySpawner/PrefabFactory path Case A/B
-// use. Kept as a separate state from SinglePlayerWhiteroom per the
-// existing one-state-per-mode convention, even though the two are now
-// near-identical thin hosts.
-import { GameSession } from "./api/session/GameSession.js";
+// Multiplayer/bots host for the session architecture (Case C). Kept as
+// a separate state from SinglePlayerWhiteroom per the existing
+// one-state-per-mode convention, even though the two are now
+// near-identical thin hosts -- see level-singleplayer-whiteroom.js for
+// the ownership rule both follow: resolve the persistent
+// GameplaySession, own only the current MapWorld's lifetime.
+import { MapWorld } from "./api/session/MapWorld.js";
+import { ServiceLocator } from "./services/ServiceLocator.js";
 
 export class MultiplayerWhiteroom {
-  init(session) {
-    this.session = session;
+  init(mapContext) {
+    this.mapContext = mapContext;
   }
 
   preload() {}
 
   create() {
-    this.gameSession = new GameSession(this.session, { game: this.game });
-    this.gameSession.start();
+    const gameplaySession = ServiceLocator.resolve("system", "GameplaySession");
+
+    if (this.mapContext?.map) gameplaySession.config.map = this.mapContext.map;
+    if (this.mapContext && "entities" in this.mapContext) {
+      gameplaySession.config.entities = this.mapContext.entities;
+    }
+
+    this.world = new MapWorld(gameplaySession, { game: this.game });
+    this.world.start();
   }
 
   update() {
-    this.gameSession.update();
+    this.world.update();
   }
 
   shutdown() {
-    if (this.gameSession) {
-      this.gameSession.destroy();
-      this.gameSession = null;
+    if (this.world) {
+      this.world.destroy();
+      this.world = null;
     }
   }
 }

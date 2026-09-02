@@ -1,36 +1,17 @@
-import { Gameplay } from "./api/rules/Gameplay.js";
-import { SinglePlayerRules } from "./api/rules/SinglePlayerRules.js";
-import { User } from "./api/rules/User.js";
+import { GameplaySession } from "./api/session/GameplaySession.js";
 import { Whiteroom } from "./level-whiteroom.js";
 import { SinglePlayerWhiteroom } from "./level-singleplayer-whiteroom.js";
 import { MultiplayerWhiteroom } from "./level-multiplayer-whiteroom.js";
-import { singlePlayerSession } from "./api/session/sessions.js";
+import { GameMenu } from "./ui/GameMenu.js";
 
-// const gameplay = new Gameplay({
-//   rules: new SinglePlayerRules({
-//     spawn: {
-//       x: 10,
-//       y: 10,
-//     },
-//   }),
-// });
-// const player = new User({
-//   id: "player-1",
-
-//   state: {
-//     health: 100,
-//     ammo: 20,
-//     inventory: {
-//       items: ["pistol"],
-//       equipped: "pistol",
-//     },
-//   },
-// });
-// gameplay.addPlayer(player);
-// gameplay.loadMap("e1m1");
-// gameplay.start();
-
-// BasicGame.gameplay = gameplay;
+// Which Phaser state hosts a given gameMode's gameplay -- the only
+// mapping the application layer needs; everything else about a mode
+// (rules class, spawn behaviour) is already decided by
+// createRulesForSession()/MapWorld.
+const STATE_BY_MODE = {
+  deathmatch: "MultiplayerWhiteroom",
+};
+const DEFAULT_GAMEPLAY_STATE = "SinglePlayerWhiteroom";
 
 BasicGame.Boot = function (game) {};
 
@@ -45,13 +26,9 @@ BasicGame.Boot.prototype = {
   preload: function () {
     this.load.spritesheet("Cobra", "assets/_ship_default.png", 32, 32);
     this.load.image("wallTexture", "assets/textures/wall.png");
-
     this.load.image("floorTexture", "assets/textures/floor.png");
-
     this.load.image("ceilingTexture", "assets/textures/ceiling.png");
-
     this.load.image("brickTexture", "assets/textures/brick.png");
-
     this.load.image("skyTexture", "assets/textures/sky.png");
     this.load.image("pixelWhite", "assets/_pixel_white.png");
     this.load.image("Plasma", "assets/projectiles/plasma.png");
@@ -82,45 +59,56 @@ BasicGame.Boot.prototype = {
     // game.camera.roundPx = false; // stops the sprite from jittering.
     // game.camera.lerp = 0.5;
 
-    // The session/spawning test level -- see level-singleplayer-whiteroom.js.
-    // "Whiteroom" (the pre-session state) is still registered below and
-    // reachable by starting it directly, kept as a rollback path.
-    game.state.start("SinglePlayerWhiteroom", true, false, singlePlayerSession);
+    // Nothing to render until the HTML menu (see GameMenu.js) starts a
+    // session -- "Menu" is an intentionally blank Phaser state, kept
+    // separate from "Boot" so returning to the menu later doesn't
+    // re-run preload().
+    game.state.start("Menu");
   },
 };
 
-// This sets up the Phaser game state on the canvas and sets the camera resolution
+BasicGame.Menu = function (game) {};
+BasicGame.Menu.prototype = {
+  create: function () {
+    game.stage.backgroundColor = "#14161a";
+  },
+};
 
-// navigator.gamepadInputEmulation = "gamepad";
-// BasicGame.ScreenHeight = 720;
+// The application layer: the one place that turns a menu-produced
+// sessionConfig into the existing persistent-session/map-state startup
+// (GameplaySession -> MapWorld -> Phaser state), and the one place that
+// tears a running session down to return to the menu. The menu itself
+// never constructs any of this -- see GameMenu.js.
+function startGameplay(sessionConfig) {
+  new GameplaySession(sessionConfig);
+  gameMenu.hide();
+  game.state.start(STATE_BY_MODE[sessionConfig.gameMode] ?? DEFAULT_GAMEPLAY_STATE);
+}
 
-// BasicGame.ScreenWidth =
-//   (window.screen.availWidth / window.screen.availHeight) *
-//   BasicGame.ScreenHeight;
+function returnToMenu() {
+  game.state.start("Menu");
+  gameMenu.show();
+}
 
-// var game = new Phaser.Game(
-//   BasicGame.ScreenWidth,
-//   BasicGame.ScreenHeight,
-//   Phaser.CANVAS,
-//   ""
-// );
+let gameMenu;
 
 // Add game states and start the game
 window.onload = function () {
+  gameMenu = new GameMenu(document.getElementById("game-menu"), {
+    onStart: startGameplay,
+  });
+
+  // Minimal, event-driven (not polled) way back to the menu from
+  // gameplay -- Phaser's state.start() below tears down the current
+  // MapWorld via its own shutdown(), same as any other state swap.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") returnToMenu();
+  });
+
   game.state.add("Boot", BasicGame.Boot);
+  game.state.add("Menu", BasicGame.Menu);
   game.state.add("Whiteroom", Whiteroom);
   game.state.add("SinglePlayerWhiteroom", SinglePlayerWhiteroom);
   game.state.add("MultiplayerWhiteroom", MultiplayerWhiteroom);
   game.state.start("Boot");
 };
-
-//Register the service worker if available.
-// if ('serviceWorker' in navigator) {
-// 		window.addEventListener('load', () => {
-// 	    navigator.serviceWorker.register('./sw.js').then(function(reg) {
-// 	        console.log('Successfully registered service worker', reg);
-// 	    }).catch(function(err) {
-// 	        console.warn('Error whilst registering service worker', err);
-// 	    });
-//   	});
-// }

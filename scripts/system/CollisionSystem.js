@@ -16,6 +16,16 @@ export class CollisionSystem extends System {
       "CollisionComponent",
     ]);
 
+    this.refreshList();
+
+    // Non-ECS collision objects.
+    // Projectiles can be added here directly.
+    this.externalList = [];
+
+    this.onCollision = null;
+  }
+
+  refreshList() {
     this.movementList = resolveComponentList(
       "MovementComponent",
       this.entities,
@@ -25,12 +35,6 @@ export class CollisionSystem extends System {
       "CollisionComponent",
       this.entities,
     );
-
-    // Non-ECS collision objects.
-    // Projectiles can be added here directly.
-    this.externalList = [];
-
-    this.onCollision = null;
   }
 
   addExternal(object) {

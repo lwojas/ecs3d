@@ -3,7 +3,8 @@ import { EventBus } from "../scripts/services/EventBus.js";
 import { EntityManager } from "../scripts/services/EntityManager.js";
 import { PrefabFactory } from "../scripts/services/PrefabFactory.js";
 import { InventorySystem } from "../scripts/system/InventorySystem.js";
-import { GameSession } from "../scripts/api/session/GameSession.js";
+import { GameplaySession } from "../scripts/api/session/GameplaySession.js";
+import { MapWorld } from "../scripts/api/session/MapWorld.js";
 
 // --- InventorySystem, against a bare InventoryComponent -----------------
 
@@ -77,7 +78,7 @@ function testGetSnapshotReturnsPlainCopy() {
   assert.deepEqual(inventorySystem.getInventory(entity).items, ["pistol"]);
 }
 
-// --- GameSession initial-inventory precedence ---------------------------
+// --- MapWorld initial-inventory precedence -------------------------------
 
 function fakeCreateRaycaster() {
   return {
@@ -98,12 +99,13 @@ const minimalMapData = {
 };
 
 function buildSession(session) {
-  const gameSession = new GameSession(session, {
+  const gameplaySession = new GameplaySession(session);
+  const world = new MapWorld(gameplaySession, {
     game: {},
     createRaycaster: fakeCreateRaycaster,
   });
-  gameSession.buildWorld();
-  return gameSession;
+  world.buildWorld();
+  return world;
 }
 
 function testAuthoredInventoryOverrideBeatsPersistent() {
@@ -177,15 +179,15 @@ const tests = [
   ["InventorySystem.equip succeeds for an owned item", testEquipSucceedsForOwnedItem],
   ["InventorySystem.getSnapshot returns an independent plain copy", testGetSnapshotReturnsPlainCopy],
   [
-    "GameSession: authored InventoryComponent override beats persistent inventory",
+    "MapWorld: authored InventoryComponent override beats persistent inventory",
     testAuthoredInventoryOverrideBeatsPersistent,
   ],
   [
-    "GameSession: persistent inventory flows in when no authored override exists",
+    "MapWorld: persistent inventory flows in when no authored override exists",
     testPersistentInventoryFlowsInWhenNoAuthoredOverride,
   ],
   [
-    "GameSession: component defaults are the final fallback",
+    "MapWorld: component defaults are the final fallback",
     testComponentDefaultsAreTheFinalFallback,
   ],
 ];

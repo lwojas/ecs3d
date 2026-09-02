@@ -8,6 +8,10 @@ export class MovementSystem extends System {
     this.entities = this.entityManager.registerSystem(this, [
       "MovementComponent",
     ]);
+    this.refreshList();
+  }
+
+  refreshList() {
     this.componentList = resolveComponentList(
       "MovementComponent",
       this.entities,

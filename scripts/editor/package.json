@@ -1,0 +1,19 @@
+{
+  "name": "ecs3d-map-editor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone React map/entity editor for ecs3d -- reads and writes JSON under scripts/data/maps and scripts/data/entities. Run with npm install && npm run dev.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8"
+  }
+}

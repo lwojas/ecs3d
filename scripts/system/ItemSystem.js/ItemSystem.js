@@ -55,7 +55,11 @@ export class ItemSystem extends System {
         this.fireToTarget(item, boundTarget, enemyTarget);
         fireRateModifier = 2; // Move this to component
       } else {
-        this.fireFromCamera(item, boundTarget);
+        this.fireFromCamera(item, boundTarget, {
+          right: 1,
+          up: -1,
+          forward: 1,
+        });
         // game.camera.shake();
         if (hasHud) this.hud.items.setState("fire");
       }
@@ -63,18 +67,49 @@ export class ItemSystem extends System {
     }
   }
 
-  fireFromCamera(item, boundTarget) {
+  //   fireFromCamera(item, boundTarget) {
+  //     const distance = 2;
+  //     const speed = 50;
+
+  //     // boundTarget.viewAngle is the same raw value CameraRenderer assigns to
+  //     // camera.pitch -- a screen-space horizon shift in pixels, not degrees
+  //     // or radians (see raycaster-api.md). Converting it to an angle
+  //     // ourselves here (via a fixed degrees/radians factor) used to be the
+  //     // bug behind aim not matching the rendered view: the real equivalent
+  //     // angle depends on the raycaster's focalLength, so getCameraForwardVector()
+  //     // is the one place that conversion happens, guaranteeing this always
+  //     // matches whatever the renderer is actually showing.
+  //     const {
+  //       x: directionX,
+  //       y: directionY,
+  //       z: directionZ,
+  //     } = this.projectileSystem.raycaster.getCameraForwardVector({
+  //       angle: boundTarget.angle,
+  //       pitch: boundTarget.viewAngle,
+  //     });
+
+  //     const x = boundTarget.x + directionX * distance;
+  //     const y = boundTarget.y + directionY * distance;
+  //     const z = boundTarget.z - 2 + directionZ * distance;
+
+  //     this.projectileSystem.fire(
+  //       item.projectile,
+  //       x,
+  //       y,
+  //       z,
+  //       directionX * speed,
+  //       directionY * speed,
+  //       directionZ * speed,
+  //       boundTarget,
+  //     );
+  //   }
+
+  fireFromCamera(item, boundTarget, offset = {}) {
     const distance = 2;
     const speed = 50;
 
-    // boundTarget.viewAngle is the same raw value CameraRenderer assigns to
-    // camera.pitch -- a screen-space horizon shift in pixels, not degrees
-    // or radians (see raycaster-api.md). Converting it to an angle
-    // ourselves here (via a fixed degrees/radians factor) used to be the
-    // bug behind aim not matching the rendered view: the real equivalent
-    // angle depends on the raycaster's focalLength, so getCameraForwardVector()
-    // is the one place that conversion happens, guaranteeing this always
-    // matches whatever the renderer is actually showing.
+    const { right = 0, forward = 0, up = 0 } = offset;
+
     const {
       x: directionX,
       y: directionY,
@@ -84,9 +119,36 @@ export class ItemSystem extends System {
       pitch: boundTarget.viewAngle,
     });
 
-    const x = boundTarget.x + directionX * distance;
-    const y = boundTarget.y + directionY * distance;
-    const z = boundTarget.z - 2 + directionZ * distance;
+    // Camera-relative right.
+    const rightX = -Math.sin(boundTarget.angle);
+    const rightY = Math.cos(boundTarget.angle);
+    const rightZ = 0;
+
+    // Camera-relative up.
+    const upX = rightY * directionZ;
+    const upY = -rightX * directionZ;
+
+    const upZ = rightX * directionY - rightY * directionX;
+
+    // Spawn position in camera space.
+    const x =
+      boundTarget.x +
+      directionX * (distance + forward) +
+      rightX * right +
+      upX * up;
+
+    const y =
+      boundTarget.y +
+      directionY * (distance + forward) +
+      rightY * right +
+      upY * up;
+
+    const z =
+      boundTarget.z -
+      2 +
+      directionZ * (distance + forward) +
+      rightZ * right +
+      upZ * up;
 
     this.projectileSystem.fire(
       item.projectile,

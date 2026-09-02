@@ -137,7 +137,10 @@ export class EntitySpawner {
   pickZonePoint(zoneName) {
     if (!zoneName) return null;
     const points = this.mapData.spawnZones?.[zoneName];
-    if (!points || !points.length) return null;
+    if (!points || !points.length) {
+      console.warn(`EntitySpawner: unknown or empty spawn zone "${zoneName}".`);
+      return null;
+    }
 
     const index = this.zoneIndex[zoneName] || 0;
     this.zoneIndex[zoneName] = (index + 1) % points.length;

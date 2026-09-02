@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { GameSession } from "../scripts/api/session/GameSession.js";
+import { GameplaySession } from "../scripts/api/session/GameplaySession.js";
+import { MapWorld } from "../scripts/api/session/MapWorld.js";
 import {
   singlePlayerSession,
   coopSession,
   deathmatchBotSession,
 } from "../scripts/api/session/sessions.js";
 
-// GameSession.buildWorld() only needs a raycaster-shaped object for
+// MapWorld.buildWorld() only needs a raycaster-shaped object for
 // spawn-point resolution -- same fake used in entity-spawning.test.mjs.
 // It never touches `game` itself in this phase, so a plain object is
 // enough; attachView()/update() (Phaser-only) are intentionally not
@@ -20,13 +21,18 @@ function fakeCreateRaycaster() {
   };
 }
 
+// Builds the persistent GameplaySession (Gameplay/Rules/Users) and the
+// current MapWorld together, since these tests only care about a single
+// map's world -- see session-lifecycle.test.mjs for a test that spans
+// two MapWorld instances off one GameplaySession.
 function buildSession(sessionConfig) {
-  const session = new GameSession(sessionConfig, {
+  const gameplaySession = new GameplaySession(sessionConfig);
+  const world = new MapWorld(gameplaySession, {
     game: {},
     createRaycaster: fakeCreateRaycaster,
   });
-  session.buildWorld();
-  return session;
+  world.buildWorld();
+  return world;
 }
 
 function testSinglePlayerSessionUsesAuthoredPlayerEntity() {

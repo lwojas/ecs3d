@@ -5,8 +5,13 @@ export class LightSystem extends System {
   constructor(renderer) {
     super();
     this.entities = this.entityManager.registerSystem(this, ["LightComponent"]);
-    this.lightList = resolveComponentList("LightComponent", this.entities);
+    // console.log(this.entities);
+    this.refreshList();
     this.renderLightList = renderer.lights;
+  }
+
+  refreshList() {
+    this.lightList = resolveComponentList("LightComponent", this.entities);
   }
 
   update() {

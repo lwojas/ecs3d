@@ -20,14 +20,19 @@ export class TriggerSystem extends System {
     this.entities = this.entityManager.registerSystem(this, [
       "TriggerComponent",
     ]);
+    this.refreshList();
+  }
 
+  refreshList() {
     this.triggerList = resolveComponentList("TriggerComponent", this.entities);
   }
 
   update() {
     const len = this.triggerList.length;
+    const colLen = this.collisionEvents.length;
 
     if (len === 0) return;
+    if (colLen === 0) return;
 
     // Clear the reusable current-frame sets.
     for (let i = 0; i < len; i++) {
@@ -35,7 +40,8 @@ export class TriggerSystem extends System {
     }
 
     // Build current overlaps.
-    for (const event of this.collisionEvents) {
+    for (let i = 0; i < colLen; i++) {
+      const event = this.collisionEvents[i];
       this.recordCollision(event.source, event.target);
       this.recordCollision(event.target, event.source);
     }

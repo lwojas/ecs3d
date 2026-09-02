@@ -1,0 +1,87 @@
+// AUTO-GENERATED from componentDefaults.json by tools/build-data.js -- do not edit by hand.
+export default {
+  "player": {
+    "MovementComponent": {},
+    "ItemComponent": {},
+    "InventoryComponent": {},
+    "HealthComponent": {},
+    "ActorComponent": {},
+    "CollisionComponent": {
+      "radius": 2
+    },
+    "HudComponent": {}
+  },
+  "enemy": {
+    "SpriteComponent": {
+      "x": 28,
+      "y": 14
+    },
+    "MovementComponent": {
+      "x": 28,
+      "y": 14,
+      "z": 8
+    },
+    "CollisionComponent": {},
+    "AIComponent": {
+      "disposition": "enemy",
+      "viewDistance": 100,
+      "attackRadius": 30
+    },
+    "ItemComponent": {},
+    "InventoryComponent": {
+      "items": [
+        "pistol"
+      ],
+      "equipped": "pistol"
+    },
+    "PatrolComponent": {
+      "patrolPoints": [
+        {
+          "x": 20,
+          "y": 14
+        },
+        {
+          "x": 44,
+          "y": 14
+        }
+      ]
+    },
+    "HealthComponent": {},
+    "ActorComponent": {
+      "team": "enemy"
+    }
+  },
+  "trigger": {
+    "MovementComponent": {},
+    "CollisionComponent": {
+      "radius": 2,
+      "height": 32
+    }
+  },
+  "pickup": {
+    "SpriteComponent": {
+      "texture": "health",
+      "scale": 2,
+      "billboard": false,
+      "angle": 45
+    },
+    "MovementComponent": {
+      "z": 0,
+      "y": 24
+    },
+    "CollisionComponent": {
+      "radius": 2,
+      "height": 16
+    },
+    "PickupComponent": {},
+    "TriggerComponent": {
+      "once": false,
+      "onEnter": [
+        {
+          "event": "resource.add"
+        }
+      ]
+    },
+    "TransformComponent": {}
+  }
+};

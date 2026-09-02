@@ -56,16 +56,12 @@ export class PrefabFactory {
 
     // A duplicated uniqueId in authored data silently produces two
     // separate Entity objects (EntityManager has no dedup) -- the second
-    // wins whichever id-keyed lookup (e.g. GameSession.entityById) is
-    // built afterward, while the first becomes an orphan that's still
-    // fully alive in every system's component lists (a static, never-
-    // updated collider is exactly what this looks like for anything with
-    // a CollisionComponent). Not fatal -- just loud, since this is easy
-    // to introduce by copy-pasting an authored entity.
-    if (
-      uniqueId &&
-      this.entityManager.world.some((existing) => existing.id === uniqueId)
-    ) {
+    // wins EntityManager.getEntity(), while the first becomes an orphan
+    // that's still fully alive in every system's component lists (a
+    // static, never-updated collider is exactly what this looks like for
+    // anything with a CollisionComponent). Not fatal -- just loud, since
+    // this is easy to introduce by copy-pasting an authored entity.
+    if (uniqueId && this.entityManager.getEntity(uniqueId)) {
       console.warn(
         `PrefabFactory: duplicate uniqueId "${uniqueId}" -- creating a second, separate entity.`,
       );

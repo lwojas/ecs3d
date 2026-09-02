@@ -10,7 +10,10 @@ export class CombatSystem extends System {
     this.entities = this.entityManager.registerSystem(this, [
       "HealthComponent",
     ]);
+    this.refreshList();
+  }
 
+  refreshList() {
     this.componentList = resolveComponentList("HealthComponent", this.entities);
   }
 

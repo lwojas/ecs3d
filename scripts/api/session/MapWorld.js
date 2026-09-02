@@ -1,5 +1,5 @@
 import { Raycaster } from "../../system/Raycaster.js";
-import { componentDefaults } from "../../data/SharedData.js";
+import componentDefaults from "../../data/templates/componentDefaults.js";
 import { EntityManager } from "../../services/EntityManager.js";
 import { PrefabFactory } from "../../services/PrefabFactory.js";
 import { EntitySpawner } from "../../services/EntitySpawner.js";
@@ -26,14 +26,7 @@ import { ItemSystem } from "../../system/ItemSystem.js/ItemSystem.js";
 import { AISystem } from "../../system/AISystem.js";
 import { CombatSystem } from "../../system/CombatSystem.js";
 import { TriggerSystem } from "../../system/TriggerSystem.js";
-import { Gameplay } from "../rules/Gameplay.js";
-import { User } from "../rules/User.js";
-import { createRulesForSession } from "./createRulesForSession.js";
-import {
-  resolveMapData,
-  resolveEntityData,
-  resolveSessionPlayers,
-} from "./sessions.js";
+import { resolveMapData, resolveEntityData, resolveSessionPlayers } from "./sessions.js";
 import { componentClasses } from "../../services/ComponentClasses.js";
 import { TransformSystem } from "../../system/TransformSystem.js";
 
@@ -52,26 +45,33 @@ function createDefaultRaycaster(game, mapData) {
   return raycaster;
 }
 
-// The single orchestration point that turns a plain session config into
-// a playable game. A Phaser state's job is only to host this -- forward
-// init/create/update/shutdown -- never to decide what exists, where, or
-// how many (see sessions.js for the session data contract).
+// The current map/world -- everything that only lives as long as the
+// map does. A Phaser state hosts this -- forward init/create/update/
+// shutdown -- never a GameplaySession itself; see GameplaySession.js
+// for the persistent gameplay/rules/users that survive across
+// MapWorld instances.
 //
-//   Session config -> GameSession -> Map + entity data + Rules/Gameplay
-//                                     + players + bots (all via the
-//                                     existing EntitySpawner/PrefabFactory)
-//                                     + ECS systems
+//   GameplaySession -> MapWorld -> map + entity data
+//                                  + EntityManager/EntitySpawner
+//                                  + player ECS entities (hydrated from
+//                                    the persistent Users GameplaySession
+//                                    already owns)
+//                                  + ECS systems
 //
 // Split into buildWorld() (no Phaser/DOM dependency beyond an injectable
 // raycaster factory) and attachView() (HUD/camera/input -- Phaser-only),
 // so the world-construction/spawning logic is unit-testable without a
-// browser; see tests/game-session.test.mjs.
-export class GameSession {
+// browser; see tests/game-session.test.mjs and
+// tests/session-lifecycle.test.mjs.
+export class MapWorld {
   constructor(
-    sessionConfig,
+    gameplaySession,
     { game, createRaycaster = createDefaultRaycaster } = {},
   ) {
-    this.config = sessionConfig;
+    this.gameplaySession = gameplaySession;
+    this.config = gameplaySession.config;
+    this.gameplayManager = gameplaySession.gameplay;
+    this.rules = gameplaySession.rules;
     this.game = game;
     this.createRaycaster = createRaycaster;
   }
@@ -102,11 +102,13 @@ export class GameSession {
     });
 
     // Case A/B: whatever authored entities the session's entity data
-    // references -- each carries its own SpawnComponent.
-    this.entities = this.spawner.spawnAuthored(entityData);
-    this.entityById = new Map(
-      this.entities.map((entity) => [entity.id, entity]),
-    );
+    // references -- each carries its own SpawnComponent. Every entity
+    // this spawns (or anything else spawns below) is already registered
+    // with this.entityManager by EntitySpawner/PrefabFactory -- see the
+    // entities/getEntity() facade at the bottom of this class, which
+    // reads through to it rather than keeping a second, separately
+    // maintained collection here.
+    this.spawner.spawnAuthored(entityData);
 
     // Players: a bot is a player controlled by AI, not a separate enemy
     // population -- resolveSessionPlayers() folds session.botCount into
@@ -121,7 +123,11 @@ export class GameSession {
     this.playerEntities = new Map();
     players.forEach((sessionPlayer) => {
       const isBot = sessionPlayer.controller === "bot";
-      let entity = this.entityById.get(sessionPlayer.id);
+      // The persistent User for this player -- owned by GameplaySession's
+      // Gameplay, not this world. Bots get one too (so gameplay.players
+      // stays the single roster), it just has no meaningful `state`.
+      const user = this.gameplayManager.getPlayer(sessionPlayer.id);
+      let entity = this.getEntity(sessionPlayer.id);
 
       if (!entity) {
         // team and controller are orthogonal overrides -- a human can
@@ -144,12 +150,8 @@ export class GameSession {
         // session.botModifiers. Each stage overrides the same key in the
         // last (not cumulative/multiplied), consistent with every other
         // default->override merge in this codebase. These are
-        // stat/config modifiers only (they land on component fields via
-        // EntitySpawner's applyModifiers, e.g. healthMultiplier ->
-        // HealthComponent.maximum) -- AI-behaviour tuning (accuracy,
-        // reaction time, ...) is a different domain and doesn't belong
-        // in this merge; it would be its own AIComponent field override
-        // instead, the same way `components.AIComponent` above is set.
+        // scenario/session-level config, not persistent player state --
+        // they stay sourced from the session, not the persistent User.
         const modifiers = {
           ...session.modifiers,
           ...sessionPlayer.modifiers,
@@ -165,26 +167,24 @@ export class GameSession {
           components,
           modifiers,
         });
-        this.entities.push(entity);
-        this.entityById.set(entity.id, entity);
       }
 
       // Initial InventoryComponent precedence: an authored/scenario
       // override on this entity's own data always wins (a scripted
       // mission loadout beats whatever the player was carrying);
-      // otherwise the player's persistent inventory carries forward;
+      // otherwise the persistent User's inventory carries forward;
       // component defaults (already applied during construction above)
-      // are the last resort. A bot with no `state` (the common case)
-      // simply has nothing to apply here and keeps the component
-      // defaults -- it never needs a human-shaped User.state. Loaded via
-      // InventorySystem so this goes through the same add/equip
-      // operations any other caller would use.
+      // are the last resort. A bot's User has no meaningful `state` (the
+      // common case) and simply has nothing to apply here, keeping the
+      // component defaults -- it never needs a human-shaped User.state.
+      // Loaded via InventorySystem so this goes through the same
+      // add/equip operations any other caller would use.
       const authoredInventory = entityData.find(
         (data) => data.uniqueId === sessionPlayer.id,
       )?.components?.InventoryComponent;
 
-      if (!authoredInventory && sessionPlayer.state?.inventory) {
-        const persistentInventory = sessionPlayer.state.inventory;
+      const persistentInventory = user?.state?.inventory;
+      if (!authoredInventory && persistentInventory) {
         const inventory = this.inventorySystem.getInventory(entity);
         if (inventory) {
           inventory.items = [];
@@ -201,24 +201,30 @@ export class GameSession {
         (data) => data.uniqueId === sessionPlayer.id,
       )?.components?.ResourceComponent;
 
-      if (!authoredResources && sessionPlayer.state?.resources) {
-        const resources = { ...sessionPlayer.state.resources };
+      const persistentResources = user?.state?.resources;
+      if (!authoredResources && persistentResources) {
+        const resources = { ...persistentResources };
         entity.addComponent(
           new componentClasses["ResourceComponent"](entity, resources),
           resources,
         );
       }
 
+      user?.bindEntity(entity.id);
       this.playerEntities.set(sessionPlayer.id, entity);
     });
 
-    const rules = createRulesForSession(session, { spawner: this.spawner });
-    this.gameplayManager = new Gameplay({ rules });
-    players.forEach((sessionPlayer) => {
-      this.gameplayManager.addPlayer(new User(sessionPlayer));
+    // Rules persist across maps; the spawner (and this world's other
+    // context) doesn't -- hand it over now, MapWorld.destroy() takes it
+    // back before this world goes away.
+    this.rules.attachWorld?.({
+      spawner: this.spawner,
+      entityManager: this.entityManager,
+      mapData,
     });
-    this.gameplayManager.loadMap(session.map);
-    this.gameplayManager.start(); // e.g. WaveRules spawns its waves here.
+
+    this.gameplayManager.loadMap(session.map); // e.g. WaveRules spawns its waves here -- fires on every map load.
+    this.gameplayManager.start(); // one-time per session; no-ops after the first map (state leaves IDLE).
   }
 
   attachView() {
@@ -261,7 +267,7 @@ export class GameSession {
       if (playerMovement) setAllBindings(user.id, playerMovement);
     });
 
-    this.movementSystem = new MovementSystem(this.raycaster, this.entities);
+    this.movementSystem = new MovementSystem(this.raycaster);
     this.spriteSystem = new SpriteSystem(this.cameraRenderer);
     this.collisionSystem = new CollisionSystem(this.cameraRenderer);
     this.projectileSystem = new ProjectileSystem(
@@ -320,19 +326,50 @@ export class GameSession {
     // exposes.
     for (const action of this.gameplayManager.consumeActions()) {
       if (action.type !== "player.respawn") continue;
-      const entity = this.entityById.get(action.playerId);
+      const entity = this.getEntity(action.playerId);
       if (entity) this.spawner.respawn(entity);
     }
 
     this.hud.setItemLighting(this.cameraRenderer.viewmodelLight);
   }
 
+  // Only tears down this map's world -- GameplaySession's Gameplay,
+  // Rules and Users are untouched and outlive this instance.
   destroy() {
+    this.rules.detachWorld?.();
+
+    // Snapshot whatever's snapshot-able back onto each persistent User
+    // before their entity goes away, and unbind -- the seam a future
+    // map-transition/checkpoint rule can build on for the rest of
+    // User.state (health, resources, ...).
+    for (const sessionPlayer of this.sessionPlayers ?? []) {
+      const user = this.gameplayManager.getPlayer(sessionPlayer.id);
+      const entity = this.playerEntities?.get(sessionPlayer.id);
+      if (!user || !entity) continue;
+
+      const inventorySnapshot = this.inventorySystem.getSnapshot(entity);
+      if (inventorySnapshot) user.setState({ inventory: inventorySnapshot });
+      user.unbindEntity();
+    }
+
     if (this.raycaster) {
       this.raycaster.destroy();
       this.raycaster = null;
     }
-    this.gameplayManager = null;
     clearAllBindings();
+  }
+
+  // A read-only facade onto this.entityManager, not a second runtime
+  // store -- EntityManager is the one authoritative collection of live
+  // ECS entities (authored, player, bot, or dynamically spawned by a
+  // GameRules subclass; all of them pass through the same
+  // EntitySpawner/PrefabFactory -> EntityManager.addEntity() path), so
+  // there's nothing here to keep manually synchronised.
+  get entities() {
+    return this.entityManager.world;
+  }
+
+  getEntity(id) {
+    return this.entityManager.getEntity(id);
   }
 }

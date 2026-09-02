@@ -1,6 +1,6 @@
 import { Raycaster } from "./system/Raycaster.js";
 import { testLevel } from "./data/3dtestLevel.js";
-import { componentDefaults } from "./data/SharedData.js";
+import componentDefaults from "./data/templates/componentDefaults.js";
 import { EntityManager } from "./services/EntityManager.js";
 import { PrefabFactory } from "./services/PrefabFactory.js";
 import { EventBus } from "./services/EventBus.js";

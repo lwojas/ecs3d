@@ -5,7 +5,7 @@ export class System {
     this.systemListeners = new Map();
     this.listenerList = [];
     this.componentLists = {};
-    this.actors = [];
+    // this.actors = [];
     // this.entities;
     this.entityManager = ServiceLocator.resolve("game", "EntityManager");
   }
