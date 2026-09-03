@@ -55,7 +55,7 @@ export default {
     "MovementComponent": {},
     "CollisionComponent": {
       "radius": 2,
-      "height": 32
+      "height": 4
     }
   },
   "pickup": {
@@ -71,7 +71,7 @@ export default {
     },
     "CollisionComponent": {
       "radius": 2,
-      "height": 16
+      "height": 4
     },
     "PickupComponent": {},
     "TriggerComponent": {

@@ -10,9 +10,13 @@
     "test:spawning": "node tests/entity-spawning.test.mjs",
     "test:session": "node tests/game-session.test.mjs",
     "test:lifecycle": "node tests/session-lifecycle.test.mjs",
+    "test:wasm-contract": "node tests/wasm-renderer-contract.test.mjs",
+    "test:wasm-parity": "node tests/wasm-render-parity.test.mjs",
     "test:inventory": "node tests/inventory.test.mjs",
     "test:trigger": "node tests/trigger.test.mjs",
     "data:build": "node tools/build-data.js",
+    "benchmark:raycaster": "node tools/benchmark-raycaster.mjs",
+    "build:raycaster-wasm": "em++ scripts/system/wasm/RaycasterRenderer.cpp -O3 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ENVIRONMENT=web -s EXPORTED_FUNCTIONS='['_raycaster_resize','_raycaster_framebuffer','_raycaster_framebuffer_size','_raycaster_clear','_raycaster_reset_depth','_raycaster_depth_buffer','_raycaster_depth_buffer_size','_raycaster_update_world','_raycaster_update_cell','_raycaster_update_texture','_raycaster_update_camera','_raycaster_update_config','_raycaster_update_frame','_raycaster_set_sky','_raycaster_render_snapshot','_raycaster_width','_raycaster_height','_raycaster_world_map_size','_raycaster_cell_count','_raycaster_section_count','_raycaster_material_count','_raycaster_texture_count','_raycaster_sprite_count','_raycaster_light_count','_raycaster_ambient','_raycaster_camera_fov','_raycaster_destroy','_malloc','_free']' -s EXPORTED_RUNTIME_METHODS='['ccall','cwrap','HEAPU8']' -o scripts/system/wasm/RaycasterRenderer.js",
     "prestart": "npm run data:build",
     "start": "lite-server"
   },
