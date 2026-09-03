@@ -26,7 +26,11 @@ import { ItemSystem } from "../../system/ItemSystem.js/ItemSystem.js";
 import { AISystem } from "../../system/AISystem.js";
 import { CombatSystem } from "../../system/CombatSystem.js";
 import { TriggerSystem } from "../../system/TriggerSystem.js";
-import { resolveMapData, resolveEntityData, resolveSessionPlayers } from "./sessions.js";
+import {
+  resolveMapData,
+  resolveEntityData,
+  resolveSessionPlayers,
+} from "./sessions.js";
 import { componentClasses } from "../../services/ComponentClasses.js";
 import { TransformSystem } from "../../system/TransformSystem.js";
 
@@ -40,6 +44,7 @@ function createDefaultRaycaster(game, mapData) {
     cameraHeight: 4,
     fov: Math.PI / 3,
     maxDistance: 1000,
+    renderer: "wasm",
   });
   raycaster.resizeToCamera();
   return raycaster;

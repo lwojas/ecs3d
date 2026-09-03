@@ -12,7 +12,11 @@
     "SpriteComponent": { "x": 28, "y": 14 },
     "MovementComponent": { "x": 28, "y": 14, "z": 8 },
     "CollisionComponent": {},
-    "AIComponent": { "disposition": "enemy", "viewDistance": 100, "attackRadius": 30 },
+    "AIComponent": {
+      "disposition": "enemy",
+      "viewDistance": 100,
+      "attackRadius": 30
+    },
     "ItemComponent": {},
     "InventoryComponent": { "items": ["pistol"], "equipped": "pistol" },
     "PatrolComponent": {
@@ -26,12 +30,17 @@
   },
   "trigger": {
     "MovementComponent": {},
-    "CollisionComponent": { "radius": 2, "height": 32 }
+    "CollisionComponent": { "radius": 2, "height": 4 }
   },
   "pickup": {
-    "SpriteComponent": { "texture": "health", "scale": 2, "billboard": false, "angle": 45 },
+    "SpriteComponent": {
+      "texture": "health",
+      "scale": 2,
+      "billboard": false,
+      "angle": 45
+    },
     "MovementComponent": { "z": 0, "y": 24 },
-    "CollisionComponent": { "radius": 2, "height": 16 },
+    "CollisionComponent": { "radius": 2, "height": 4 },
     "PickupComponent": {},
     "TriggerComponent": {
       "once": false,
