@@ -29,6 +29,7 @@ export class PickupSystem {
     this.inventorySystem.add(entity, pickup.itemName);
     if (!entity.hasComponent("HudComponent")) return;
     this.inventorySystem.syncHud(entity);
+    // console.log(this.inventorySystem);
     this.hud.notify(`Acquired ${pickup.itemName}`, 600);
     if (this.audioSystem) {
       this.audioSystem.play("pickup");

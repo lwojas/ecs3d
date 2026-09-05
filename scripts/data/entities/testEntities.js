@@ -93,8 +93,8 @@ export default [
         "layer": "TRIGGER"
       },
       "PickupComponent": {
-        "pickupType": "item",
-        "itemName": "key01"
+        "itemName": "key01",
+        "category": "item"
       },
       "TriggerComponent": {
         "once": false,
