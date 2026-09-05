@@ -80,12 +80,14 @@ export class CollisionSystem extends System {
         });
       }
 
-      //   console.log(collision);
-
       for (let j = i + 1; j < len; j++) {
         const otherCollision = collisionList[j];
 
         if (!otherCollision.enabled) {
+          continue;
+        }
+
+        if (!this.canCollide(collision, otherCollision)) {
           continue;
         }
 
@@ -144,6 +146,11 @@ export class CollisionSystem extends System {
         }
       }
     }
+  }
+
+  canCollide(a, b) {
+    // console.log("Checking collision between layers:", a, "and", b);
+    return (a.mask & b.layer) !== 0 && (b.mask & a.layer) !== 0;
   }
 
   overlaps(positionA, collisionA, positionB, collisionB) {

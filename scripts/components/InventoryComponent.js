@@ -1,4 +1,12 @@
 export class InventoryComponent {
+  static editor = {
+    fields: {
+      items: { type: "array" },
+      equipped: { type: "string" },
+      resources: { type: "object" },
+    },
+  };
+
   constructor(entity, data = {}) {
     this.entity = entity;
     this.enabled = true;

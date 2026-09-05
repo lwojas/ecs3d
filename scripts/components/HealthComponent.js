@@ -1,4 +1,11 @@
 export class HealthComponent {
+  static editor = {
+    fields: {
+      maximum: { type: "number" },
+      invulnerable: { type: "boolean" },
+    },
+  };
+
   constructor(entity, data) {
     this.enabled = true;
     this.entity = entity;

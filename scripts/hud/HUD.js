@@ -76,4 +76,8 @@ export default class HUD {
   destroy() {
     this.root.destroy();
   }
+
+  update(delta) {
+    this.items.update(delta);
+  }
 }

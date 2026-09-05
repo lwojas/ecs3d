@@ -1,4 +1,16 @@
 export class MovementComponent {
+  static editor = {
+    fields: {
+      x: { type: "number" },
+      y: { type: "number" },
+      z: { type: "number" },
+      angle: { type: "number" },
+      viewAngle: { type: "number" },
+      mouseSensitivity: { type: "number" },
+      speed: { type: "number" },
+    },
+  };
+
   constructor(entity, data) {
     this.entity = entity;
     this.enabled = true;

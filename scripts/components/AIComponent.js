@@ -1,4 +1,17 @@
 export class AIComponent {
+  static editor = {
+    fields: {
+      disposition: { type: "string" },
+      viewDistance: { type: "number" },
+      fieldOfView: { type: "number" },
+      attackRadius: { type: "number" },
+      turnSpeed: { type: "number" },
+      awarenessMemory: { type: "number" },
+      decisionInterval: { type: "number" },
+      moveSpeed: { type: "number" },
+    },
+  };
+
   constructor(entity, data = {}) {
     this.entity = entity;
     this.enabled = true;

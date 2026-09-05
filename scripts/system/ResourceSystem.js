@@ -18,17 +18,10 @@ export class ResourceSystem extends System {
   }
 }
 
-export function addResource(resourceComponent, pickupComponent) {
-  switch (pickupComponent.category) {
-    case "ammo":
-      if (!resourceComponent) return;
-      resourceComponent.resources[pickupComponent.type] +=
-        pickupComponent.amount;
-      break;
-
-    default:
-      break;
-  }
+export function addResource(pickupComponent, resourceComponent) {
+  if (!resourceComponent) return;
+  resourceComponent.resources[pickupComponent.itemName] +=
+    pickupComponent.amount;
 }
 
 export function checkResource(resourceName, entity) {

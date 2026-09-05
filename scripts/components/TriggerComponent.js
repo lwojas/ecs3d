@@ -1,4 +1,13 @@
 export class TriggerComponent {
+  static editor = {
+    fields: {
+      enabled: { type: "boolean" },
+      once: { type: "boolean" },
+      onEnter: { type: "array" },
+      ignoredTypes: { type: "array" },
+    },
+  };
+
   constructor(entity, data = {}) {
     this.entity = entity;
 
@@ -13,6 +22,7 @@ export class TriggerComponent {
     // computes exits as a side effect, so adding them later is one more
     // field here + one more branch there, not a redesign.
     this.onEnter = data.onEnter ?? [];
+    this.ignoredTypes = data.ignoredTypes || ["enemy"];
 
     // Runtime-only bookkeeping, never authored -- kept here (like
     // AIComponent.state, ItemComponent.nextFireTime) rather than as
@@ -21,6 +31,5 @@ export class TriggerComponent {
     this.hasFired = false; // for `once`: has this trigger fired at all yet
     this.activeEntities = new Set(); // who's currently considered "inside" it
     this.currentEntities = new Set();
-    this.ignoredTypes = data.ignoredTypes || ["enemy"];
   }
 }

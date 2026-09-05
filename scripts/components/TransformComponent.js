@@ -1,4 +1,11 @@
 export class TransformComponent {
+  static editor = {
+    fields: {
+      transformations: { type: "object" },
+      loop: { type: "boolean" },
+    },
+  };
+
   constructor(entity, data) {
     this.entity = entity;
     this.transformations = {

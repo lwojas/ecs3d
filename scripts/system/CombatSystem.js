@@ -2,10 +2,11 @@ import { resolveComponentList } from "../tools/componentResolver.js";
 import { System } from "./System.js";
 
 export class CombatSystem extends System {
-  constructor(ecs, collisionEvents) {
+  constructor(ecs, collisionEvents, bloodSplat) {
     super();
     this.collisionEvents = collisionEvents;
     this.messageQueue = ecs;
+    this.bloodSplat = bloodSplat;
 
     this.entities = this.entityManager.registerSystem(this, [
       "HealthComponent",
@@ -81,11 +82,16 @@ export class CombatSystem extends System {
       const event = this.collisionEvents[i];
       const friendly = this.checkFriendlyFire(event.source, event.target);
       if (event.source.damage && !friendly) {
-        // this.checkFriendlyFire(event.source, event.target);
-        // console.log(event.source.constructor.name);
         const hit = this.applyDamage(event.target, event.source);
-        if (hit && event.source.constructor.name === "Projectile")
+        // Needs decoupling from Prjectile
+        if (hit && event.source.constructor.name === "Projectile") {
+          this.bloodSplat.spawn({
+            x: event.source.x,
+            y: event.source.y,
+            z: event.source.z,
+          });
           event.source.active = false;
+        }
       }
     }
   }

@@ -133,7 +133,7 @@ export default {
       "cellY": 4.5,
       "angle": 0
     },
-    "hostileA": {
+    "enemyStart": {
       "cellX": 13.5,
       "cellY": 4.5,
       "angle": 3.14159

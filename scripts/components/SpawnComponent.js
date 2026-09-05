@@ -1,4 +1,11 @@
 export class SpawnComponent {
+  static editor = {
+    fields: {
+      point: { type: "string" },
+      zone: { type: "string" },
+    },
+  };
+
   constructor(entity, data = {}) {
     this.entity = entity;
     this.enabled = true;

@@ -1,10 +1,15 @@
 // import { runtimeTargets } from "../services/RuntimeTargets.js";
-import { runtimeBindings, getBindings } from "../tools/runtimeBindings.js";
+import {
+  runtimeBindings,
+  getBindings,
+  inputBindings,
+} from "../tools/runtimeBindings.js";
 
 export class InputController {
   constructor(userId, InteractionSystem) {
     this.userId = userId;
     this.runtimeBindings = getBindings(userId);
+    this.inputBindings = inputBindings;
     this.InteractionSystem = InteractionSystem;
     this.mouseLook = {
       active: false,
@@ -53,6 +58,8 @@ export class InputController {
       if (!this.mouseLook.active) {
         return;
       }
+      this.inputBindings.pointer.movementX += event.movementX;
+      this.inputBindings.pointer.movementY += event.movementY;
       this.target.angle += event.movementX * this.mouseLook.sensitivity;
       this.target.viewAngle -=
         event.movementY * this.mouseLook.sensitivity * 100;

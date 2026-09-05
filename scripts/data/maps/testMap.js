@@ -20,7 +20,7 @@ export default {
     "1000010001000001",
     "1000010301000001",
     "1000010001000001",
-    "1000010222000001",
+    "1000015222000001",
     "1000000000000001",
     "1000000000000001",
     "1000000000000001",
@@ -159,6 +159,18 @@ export default {
         "width": 4,
         "height": 4
       }
+    },
+    "5": {
+      "floorHeight": 0,
+      "ceilingHeight": 4,
+      "wall": {
+        "texture": "doorTexture",
+        "width": 4,
+        "height": 4
+      },
+      "floor": null,
+      "ceiling": null,
+      "name": "door"
     }
   },
   "spawnPoints": {
@@ -172,7 +184,7 @@ export default {
       "cellY": 2.5,
       "angle": 0
     },
-    "enemySpawn": {
+    "enemyStart": {
       "cellX": 7,
       "cellY": 3.5,
       "angle": 0

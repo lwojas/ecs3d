@@ -7,7 +7,14 @@ export default {
     "HealthComponent": {},
     "ActorComponent": {},
     "CollisionComponent": {
-      "radius": 2
+      "radius": 0.5,
+      "offsetZ": -3,
+      "layer": "PLAYER",
+      "mask": [
+        "NPC",
+        "PROJECTILE",
+        "TRIGGER"
+      ]
     },
     "HudComponent": {}
   },
@@ -19,9 +26,11 @@ export default {
     "MovementComponent": {
       "x": 28,
       "y": 14,
-      "z": 8
+      "z": 2
     },
-    "CollisionComponent": {},
+    "CollisionComponent": {
+      "layer": "NPC"
+    },
     "AIComponent": {
       "disposition": "enemy",
       "viewDistance": 100,
@@ -54,8 +63,9 @@ export default {
   "trigger": {
     "MovementComponent": {},
     "CollisionComponent": {
-      "radius": 2,
-      "height": 4
+      "radius": 4,
+      "height": 8,
+      "layer": "TRIGGER"
     }
   },
   "pickup": {
@@ -71,7 +81,8 @@ export default {
     },
     "CollisionComponent": {
       "radius": 2,
-      "height": 4
+      "height": 2,
+      "layer": "TRIGGER"
     },
     "PickupComponent": {},
     "TriggerComponent": {

@@ -1,5 +1,12 @@
 export const runtimeBindings = new Map();
 
+export const inputBindings = {
+  pointer: {
+    movementX: 0,
+    movementY: 0,
+  },
+};
+
 /**
  * Register a user and create their runtime bindings.
  * Returns the bindings object for convenience.
@@ -88,4 +95,7 @@ export function clearAllBindings(userId) {
 
   bindings.boundInput = null;
   bindings.boundCamera = null;
+  bindings.boundPlayer = null;
+  inputBindings.pointer.movementX = 0;
+  inputBindings.pointer.movementY = 0;
 }

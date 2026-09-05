@@ -32,7 +32,6 @@ export class TriggerSystem extends System {
     const colLen = this.collisionEvents.length;
 
     if (len === 0) return;
-    if (colLen === 0) return;
 
     // Clear the reusable current-frame sets.
     for (let i = 0; i < len; i++) {

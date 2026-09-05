@@ -33,6 +33,12 @@ import {
 } from "./sessions.js";
 import { componentClasses } from "../../services/ComponentClasses.js";
 import { TransformSystem } from "../../system/TransformSystem.js";
+import { ServiceLocator } from "../../services/ServiceLocator.js";
+import { ParticleSystem } from "../../system/Particles/ParticleSystem.js";
+import { PARTICLE_CONFIG } from "../../system/Particles/ParticleConfig.js";
+import { BloodSplat } from "../../system/Particles/BloodSplat.js";
+import { AudioAPI } from "../audio/AudioApi.js";
+import { PickupSystem } from "../../system/PickupSystem.js";
 
 function createDefaultRaycaster(game, mapData) {
   const raycaster = new Raycaster(game, mapData, {
@@ -248,6 +254,11 @@ export class MapWorld {
       );
       if (sessionPlayer?.controller === "bot") return;
 
+      this.audio = new AudioAPI({
+        userId: user.id,
+      });
+      this.eventRouter.registerAudioSystem(this.audio);
+
       registerUser(user.id);
       const playerMovement = this.playerEntities
         .get(user.id)
@@ -272,6 +283,15 @@ export class MapWorld {
       if (playerMovement) setAllBindings(user.id, playerMovement);
     });
 
+    this.particleSystem = new ParticleSystem(
+      {
+        maxParticles: 512,
+        particles: PARTICLE_CONFIG,
+      },
+      this.cameraRenderer,
+    );
+    this.bloodSplat = new BloodSplat(this.particleSystem, { count: 12 });
+
     this.movementSystem = new MovementSystem(this.raycaster);
     this.spriteSystem = new SpriteSystem(this.cameraRenderer);
     this.collisionSystem = new CollisionSystem(this.cameraRenderer);
@@ -283,6 +303,7 @@ export class MapWorld {
     this.combatSystem = new CombatSystem(
       this.ecs,
       this.collisionSystem.collisionEvents,
+      this.bloodSplat,
     );
     this.lightSystem = new LightSystem(this.cameraRenderer);
     this.triggerSystem = new TriggerSystem(
@@ -299,6 +320,33 @@ export class MapWorld {
 
     this.hud.bringToTop();
     this.hud.notify("Welcome to hell!");
+
+    this.pickupSystem = new PickupSystem(
+      this.inventorySystem,
+      this.audio,
+      this.hud,
+    );
+    this.eventRouter.registerPickupSystem(this.pickupSystem);
+
+    function bindTestDoor(raycaster) {
+      const doorId = "5";
+      let isOpen = false;
+
+      const spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+
+      spaceKey.onDown.add(() => {
+        isOpen = !isOpen;
+
+        if (isOpen) {
+          raycaster.setCellSections(doorId, []);
+          raycaster.setCellBlocking(doorId, false);
+        } else {
+          raycaster.setCellSections(doorId, [{ material: "doorTexture" }]);
+          raycaster.setCellBlocking(doorId, true);
+        }
+      });
+    }
+    bindTestDoor(this.raycaster);
   }
 
   start() {
@@ -315,12 +363,16 @@ export class MapWorld {
     this.movementSystem.update(delta, ecs);
     this.collisionSystem.update();
     this.triggerSystem.update();
+
     this.spriteSystem.update();
+    this.particleSystem.update(delta);
     this.projectileSystem.update(delta);
     this.combatSystem.update(ecs);
     this.transformSystem.update(delta);
+
     this.lightSystem.update();
-    this.cameraRenderer.update();
+    this.cameraRenderer.update(delta);
+    this.hud.update(delta);
 
     const messages = this.ecs.consumeMessages();
     this.gameplayManager.process(messages);
@@ -342,6 +394,7 @@ export class MapWorld {
   // Rules and Users are untouched and outlive this instance.
   destroy() {
     this.rules.detachWorld?.();
+    ServiceLocator.shutDown();
 
     // Snapshot whatever's snapshot-able back onto each persistent User
     // before their entity goes away, and unbind -- the seam a future

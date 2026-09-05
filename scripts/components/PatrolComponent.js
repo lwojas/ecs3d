@@ -1,4 +1,11 @@
 export class PatrolComponent {
+  static editor = {
+    fields: {
+      patrolPoints: { type: "array" },
+      speed: { type: "number" },
+    },
+  };
+
   constructor(entity, data) {
     this.enabled = true;
     this.entity = entity;

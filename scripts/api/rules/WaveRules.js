@@ -23,7 +23,30 @@ export class WaveRules extends GameRules {
     this.mapData = null;
   }
 
-  events = {};
+  events = {
+    "player.died": "onPlayerDied",
+    "entity.moving": "onPlayerDied",
+    "entity.damaged": "onEntityDamaged",
+  };
+
+  onEntityDamaged(gameplay, message) {
+    const entity = message.target.entity;
+    // console.log(gameplay, message.currentHealth, message.target);
+    if (message.currentHealth <= 0) {
+      entity.disable();
+    }
+    const player = gameplay.getPlayer(entity.id);
+    // if (player.)
+    // console.log(player);
+    if (player && message.currentHealth <= 0) {
+      gameplay.addAction({
+        type: "player.respawn",
+        playerId: player.id,
+        spawn: this.config.spawn,
+        restoreState: this.config.respawn.restorePlayerState,
+      });
+    }
+  }
 
   // Rules persist across maps; the spawner doesn't -- MapWorld hands us
   // the current one after each build and takes it back before tearing
@@ -53,10 +76,16 @@ export class WaveRules extends GameRules {
   }
 
   spawnWave(wave) {
+    // console.log(this.mapData.spawnPoints);
+
+    if (!this.mapData.spawnPoints.enemyStart) {
+      console.log("No enemy start found, aborting wave spawn");
+      return;
+    }
     if (!this.spawner) return;
 
     const count = wave.count ?? 1;
-    const spawnZone = this.resolveSpawnZone(wave);
+    const spawnZone = "hostiles";
     for (let i = 0; i < count; i++) {
       this.spawner.spawn({
         prefab: wave.prefab,

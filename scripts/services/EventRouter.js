@@ -23,6 +23,8 @@ export class EventRouter {
     this.lightingSystem = null;
     this.hud = null;
     this.inventorySystem = null;
+    this.audioSystem = null;
+    this.pickupSystem = null;
 
     this.eventBus.on("lights.set", (data) => this.handleLightsSet(data));
     this.eventBus.on("resource.add", (data) => this.consumePickup(data));
@@ -36,10 +38,18 @@ export class EventRouter {
     this.inventorySystem = inventory;
   }
 
+  registerPickupSystem(pickup) {
+    this.pickupSystem = pickup;
+  }
+
   // Lighting events
 
   registerLightingSystem(system) {
     this.lightingSystem = system;
+  }
+
+  registerAudioSystem(system) {
+    this.audioSystem = system;
   }
 
   handleLightsSet(data) {
@@ -48,14 +58,19 @@ export class EventRouter {
   }
 
   consumePickup(data) {
-    const pickup = data.trigger.getComponent("PickupComponent");
-    const resourceComponent = data.activator.getComponent("ResourceComponent");
-    if (!resourceComponent) return;
-    addResource(resourceComponent, pickup);
-    if (!this.inventorySystem || !data.activator.hasComponent("HudComponent"))
-      return;
-    this.inventorySystem.syncHud(data.activator);
-    this.hud.notify(`+ ${pickup.amount} ${pickup.type}`, 600);
+    if (!this.pickupSystem) return;
+    this.pickupSystem.collectPickup(data);
+    // const pickup = data.trigger.getComponent("PickupComponent");
+    // const resourceComponent = data.activator.getComponent("ResourceComponent");
+    // if (!resourceComponent) return;
+    // addResource(resourceComponent, pickup);
+    // if (!this.inventorySystem || !data.activator.hasComponent("HudComponent"))
+    //   return;
+    // this.inventorySystem.syncHud(data.activator);
+    // this.hud.notify(`+ ${pickup.amount} ${pickup.type}`, 600);
+    // if (this.audioSystem) {
+    //   this.audioSystem.play("pickup");
+    // }
     // console.log(data);
   }
 }

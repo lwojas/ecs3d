@@ -32,7 +32,14 @@ BasicGame.Boot.prototype = {
     this.load.image("skyTexture", "assets/textures/sky.png");
     this.load.image("pixelWhite", "assets/_pixel_white.png");
     this.load.image("Plasma", "assets/projectiles/plasma.png");
+    this.load.image("doorTexture", "assets/textures/door.png");
     this.load.image("health", "assets/items/health.png");
+    this.load.image("keyRed", "assets/items/key_red.png");
+    this.load.image("bloodDrop", "assets/particles/blood.png");
+
+    // Audio
+    this.load.audio("sfx_pickup", "assets/audio/gui/positive.wav");
+
     this.load.spritesheet(
       "hudShotgun",
       "assets/hud/item_shotgun.png",
@@ -82,7 +89,9 @@ BasicGame.Menu.prototype = {
 function startGameplay(sessionConfig) {
   new GameplaySession(sessionConfig);
   gameMenu.hide();
-  game.state.start(STATE_BY_MODE[sessionConfig.gameMode] ?? DEFAULT_GAMEPLAY_STATE);
+  game.state.start(
+    STATE_BY_MODE[sessionConfig.gameMode] ?? DEFAULT_GAMEPLAY_STATE,
+  );
 }
 
 function returnToMenu() {

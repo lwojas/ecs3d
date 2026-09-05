@@ -49,37 +49,11 @@ export class EntityManager {
       const hasAllComponents = system.requiredComponents.every((comp) =>
         entityComponents.includes(comp),
       );
-
       if (hasAllComponents && entity.isEnabled) {
         if (!entityList.includes(entity)) {
           entityList.push(entity);
         }
       }
-      // console.log(system, entityList);
-
-      // const newList = [];
-      // this.world.forEach((worldEnity) => {
-      //   const requiredComponents = system.requiredComponents;
-      //   const hasAllComponents = requiredComponents.every((comp) =>
-      //     worldEnity.hasComponent(comp),
-      //   );
-      //   if (hasAllComponents) {
-      //     if (worldEnity.isEnabled) {
-      //       newList.push(worldEnity);
-      //     }
-      //   }
-      // });
-      // system.componentLists = {};
-      // system.requiredComponents.forEach((component) => {
-      //   system.componentLists[component] = this.makeComponentList(
-      //     newList,
-      //     component,
-      //   );
-      // });
-      // // system.actors = this.makeSpriteList(newList);
-      // system.cachedComponents = this.makeComponentList(newList);
-      // system.entities = newList;
-      // entityList = newList;
       if (system.refreshList) system.refreshList();
     }
   }
@@ -92,16 +66,8 @@ export class EntityManager {
         (comp) => entity.hasComponent(comp) && entity.isEnabled,
       ),
     );
-    // requiredComponents.forEach((component) => {
-    //   if (!system.componentLists) system.componentLists = {};
-    //   system.componentLists[component] = this.makeComponentList(
-    //     filteredEntities,
-    //     component,
-    //   );
-    // });
 
     this.systemEntityLists.set(system, filteredEntities);
-    // system.actors = this.makeSpriteList(filteredEntities);
 
     return filteredEntities;
   }

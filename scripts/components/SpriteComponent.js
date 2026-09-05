@@ -1,4 +1,21 @@
 export class SpriteComponent {
+  static editor = {
+    fields: {
+      spriteKey: { type: "string" },
+      enabled: { type: "boolean" },
+      x: { type: "number" },
+      y: { type: "number" },
+      z: { type: "number" },
+      width: { type: "number" },
+      height: { type: "number" },
+      scale: { type: "number" },
+      texture: { type: "string" },
+      billboard: { type: "boolean" },
+      angle: { type: "number" },
+      animationState: { type: "string" },
+    },
+  };
+
   constructor(entity, data) {
     this.spriteKey = data.spriteKey || "default";
     this.enabled = data.enabled ?? true;

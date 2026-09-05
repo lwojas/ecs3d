@@ -1,5 +1,7 @@
 // ItemRegistry.js
 
+import { inputBindings } from "../tools/runtimeBindings.js";
+
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value * 255)));
 }
@@ -16,11 +18,77 @@ export default class ItemRegistry {
     this.parent = game.add.group();
     parent.add(this.parent);
 
+    this.runtimeBindings = inputBindings;
+
     this.items = {};
     this.equippedId = null;
     this.equippedSprite = null;
     this.bobTween = null;
     this.bobActive = false;
+    this.sway = null;
+  }
+
+  update(dt) {
+    if (!this.sway || !this.equippedId) {
+      return;
+    }
+    const item = this.items[this.equippedId];
+    const config = item.definition.sway;
+    if (!config || !config.enabled) {
+      return;
+    }
+    const pointer = this.runtimeBindings.pointer;
+    if (!pointer) return;
+
+    // console.log(config);
+
+    const amount = config.amount !== undefined ? config.amount : 0;
+    const returnSpeed =
+      config.returnSpeed !== undefined ? config.returnSpeed : 8;
+
+    // const dt = this.game.time.physicsElapsed;
+    this.sway.targetX -= pointer.movementX;
+    this.sway.targetY -= pointer.movementY;
+    this.sway.targetX = Phaser.Math.clamp(this.sway.targetX, -amount, amount);
+    this.sway.targetY = Phaser.Math.clamp(this.sway.targetY, -amount, amount);
+    this.sway.x += (this.sway.targetX - this.sway.x) * returnSpeed * dt;
+    this.sway.y += (this.sway.targetY - this.sway.y) * returnSpeed * dt;
+    this.sway.targetX += (0 - this.sway.targetX) * returnSpeed * dt;
+    this.sway.targetY += (0 - this.sway.targetY) * returnSpeed * dt;
+    this.parent.x = this.sway.x;
+    this.parent.y = this.sway.y;
+
+    pointer.movementX = 0;
+    pointer.movementY = 0;
+  }
+
+  setSway(itemId) {
+    const item = this.items[itemId];
+
+    console.log(item);
+
+    if (!item) {
+      this.sway = null;
+      return;
+    }
+
+    const config = item.definition.sway;
+
+    if (!config || !config.enabled) {
+      this.sway = null;
+      return;
+    }
+
+    this.sway = {
+      amount: config.amount !== undefined ? config.amount : 0,
+      speed: config.returnSpeed !== undefined ? config.returnSpeed : 8,
+
+      x: 0,
+      y: 0,
+
+      targetX: 0,
+      targetY: 0,
+    };
   }
 
   register(id, definition) {
@@ -103,6 +171,8 @@ export default class ItemRegistry {
     this.createBobTween(item);
 
     this.setState(item.definition.defaultState || "idle");
+
+    this.setSway(id);
 
     return true;
   }
@@ -212,10 +282,6 @@ export default class ItemRegistry {
         0,
       )
       .loop();
-
-    // Phaser CE can destroy a tween when it is manually
-    // stopped. Keep it reusable.
-    // this.bobTween._destroyOnComplete = false;
 
     this.bobActive = false;
   }

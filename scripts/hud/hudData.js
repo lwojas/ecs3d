@@ -25,6 +25,13 @@ export const hudItems = {
       speed: 200,
     },
 
+    sway: {
+      enabled: true,
+      amount: 12,
+      sensitivity: 0.4,
+      returnSpeed: 8,
+    },
+
     defaultState: "idle",
 
     states: {
@@ -71,7 +78,14 @@ export const hudItems = {
     bob: {
       enabled: true,
       amount: 30,
-      speed: 200,
+      speed: 100,
+    },
+
+    sway: {
+      enabled: true,
+      amount: 64,
+      sensitivity: 0.4,
+      returnSpeed: 8,
     },
 
     defaultState: "idle",

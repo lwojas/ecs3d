@@ -72,5 +72,39 @@ export default [
         ]
       }
     }
+  },
+  {
+    "type": "pickup",
+    "uniqueId": "pickup_key",
+    "components": {
+      "SpriteComponent": {
+        "texture": "keyRed",
+        "scale": 2,
+        "billboard": false,
+        "angle": 45
+      },
+      "MovementComponent": {
+        "z": 0,
+        "y": 30
+      },
+      "CollisionComponent": {
+        "radius": 2,
+        "height": 2,
+        "layer": "TRIGGER"
+      },
+      "PickupComponent": {
+        "pickupType": "item",
+        "itemName": "key01"
+      },
+      "TriggerComponent": {
+        "once": false,
+        "onEnter": [
+          {
+            "event": "resource.add"
+          }
+        ]
+      },
+      "TransformComponent": {}
+    }
   }
 ];

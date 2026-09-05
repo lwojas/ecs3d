@@ -1,4 +1,16 @@
 export class LightComponent {
+  static editor = {
+    fields: {
+      enabled: { type: "boolean" },
+      x: { type: "number" },
+      y: { type: "number" },
+      z: { type: "number" },
+      radius: { type: "number" },
+      intensity: { type: "number" },
+      tint: { type: "object" },
+    },
+  };
+
   constructor(entity, data) {
     this.enabled = data.enabled ?? true;
     this.entity = entity;

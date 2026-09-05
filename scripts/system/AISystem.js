@@ -61,6 +61,7 @@ export class AISystem extends System {
   // (see System.refreshList / EntityManager.updateEntityLists), so newly
   // spawned or removed AI entities stay in sync.
   refreshList() {
+    console.log("refreshing AI system");
     this.aiList = resolveComponentList("AIComponent", this.entities);
     this.movementList = resolveComponentList(
       "MovementComponent",
@@ -391,15 +392,11 @@ export class AISystem extends System {
     const target = this.getTargetMovement(ai);
     if (!target) return;
 
-    const equippedItem = movement.entity.getComponent("InventoryComponent")?.equipped;
+    const equippedItem =
+      movement.entity.getComponent("InventoryComponent")?.equipped;
     if (!equippedItem) return;
 
-    this.itemSystem.useItem(
-      equippedItem,
-      movement.entity.id,
-      movement,
-      target,
-    );
+    this.itemSystem.useItem(equippedItem, movement.entity.id, movement, target);
   }
 
   // Fires at the target entity's *live* position, not the AI's last-known
