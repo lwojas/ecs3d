@@ -441,6 +441,35 @@ fieldset.surface-field legend {
   margin-left: auto;
 }
 
+/* Component section (list + editor, two flex columns) */
+
+.component-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.component-list-col {
+  flex: 0 0 180px;
+  min-width: 0;
+}
+
+.component-editor-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.component-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* Spawn zones */
 
 .spawn-zone {
@@ -517,6 +546,10 @@ fieldset.surface-field legend {
   color: var(--text-dim);
   padding: 40px;
   text-align: center;
+}
+
+.component-editor-col .empty-state {
+  padding: 16px;
 }
 
 .hint-text {

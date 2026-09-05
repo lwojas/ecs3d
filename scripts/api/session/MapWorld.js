@@ -39,6 +39,7 @@ import { PARTICLE_CONFIG } from "../../system/Particles/ParticleConfig.js";
 import { BloodSplat } from "../../system/Particles/BloodSplat.js";
 import { AudioAPI } from "../audio/AudioApi.js";
 import { PickupSystem } from "../../system/PickupSystem.js";
+import { ConditionalChecker } from "../../tools/conditionChecker.js";
 
 function createDefaultRaycaster(game, mapData) {
   const raycaster = new Raycaster(game, mapData, {
@@ -244,6 +245,7 @@ export class MapWorld {
     this.hud = new HUD(this.game);
     this.hud.items.registerAll(hudItems);
     this.inventorySystem.registerHud(this.hud);
+    this.conditionalChecker = new ConditionalChecker(this.inventorySystem);
 
     this.gameplayManager.players.forEach((user) => {
       // Bots have no local camera/input to bind -- without this, the
@@ -338,10 +340,39 @@ export class MapWorld {
         isOpen = !isOpen;
 
         if (isOpen) {
-          raycaster.setCellSections(doorId, []);
+          raycaster.setCellSections(doorId, [
+            {
+              bottom: 6,
+              top: 10,
+              material: {
+                texture: "wallTexture",
+                width: 4,
+                height: 4,
+              },
+            },
+          ]);
           raycaster.setCellBlocking(doorId, false);
         } else {
-          raycaster.setCellSections(doorId, [{ material: "doorTexture" }]);
+          raycaster.setCellSections(doorId, [
+            {
+              bottom: 0,
+              top: 6,
+              material: {
+                texture: "doorTexture",
+                width: 4,
+                height: 4,
+              },
+            },
+            {
+              bottom: 6,
+              top: 10,
+              material: {
+                texture: "wallTexture",
+                width: 4,
+                height: 4,
+              },
+            },
+          ]);
           raycaster.setCellBlocking(doorId, true);
         }
       });

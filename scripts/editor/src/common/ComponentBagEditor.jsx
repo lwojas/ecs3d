@@ -20,6 +20,7 @@ export default function ComponentBagEditor({ components, onChange, getResetValue
   const [showAdd, setShowAdd] = useState(false);
   const componentNames = Object.keys(components ?? {});
   const availableToAdd = Object.keys(componentDefinitions).filter((name) => !componentNames.includes(name));
+  const resetValue = selected ? getResetValue?.(selected) : undefined;
 
   function removeComponent(name) {
     onChange((prev) => {
@@ -38,75 +39,73 @@ export default function ComponentBagEditor({ components, onChange, getResetValue
   }
 
   function resetComponent(name) {
-    const resetValue = getResetValue?.(name);
-    if (resetValue === undefined) return;
-    onChange((prev) => ({ ...prev, [name]: structuredClone(resetValue) }));
+    const value = getResetValue?.(name);
+    if (value === undefined) return;
+    onChange((prev) => ({ ...prev, [name]: structuredClone(value) }));
   }
 
   return (
-    <div className="component-list">
+    <div>
       <h4>Components</h4>
-      <ul className="entity-list">
-        {componentNames.map((name) => {
-          const resetValue = getResetValue?.(name);
-          return (
-            <li
-              key={name}
-              className={name === selected ? "list-item selected" : "list-item"}
-              onClick={() => setSelected(name)}
-            >
-              <span>{name}</span>
-              <span className="component-actions">
+      <div className="component-section">
+        <div className="component-list-col">
+          <ul className="entity-list">
+            {componentNames.map((name) => (
+              <li
+                key={name}
+                className={name === selected ? "list-item selected" : "list-item"}
+                onClick={() => setSelected(name)}
+              >
+                <span>{componentDisplayName(name)}</span>
+              </li>
+            ))}
+          </ul>
+
+          {!showAdd ? (
+            <button onClick={() => setShowAdd(true)} disabled={availableToAdd.length === 0}>
+              + Add Component
+            </button>
+          ) : (
+            <div className="palette-add-options">
+              {availableToAdd.map((name) => (
+                <button key={name} onClick={() => addComponent(name)}>
+                  {componentDisplayName(name)}
+                </button>
+              ))}
+              <button onClick={() => setShowAdd(false)}>Cancel</button>
+            </div>
+          )}
+        </div>
+
+        <div className="component-editor-col">
+          {selected && components[selected] !== undefined ? (
+            <>
+              <ComponentEditor
+                key={selected}
+                name={selected}
+                data={components[selected]}
+                onChange={(data) => onChange((prev) => ({ ...prev, [selected]: data }))}
+              />
+              <div className="component-editor-actions">
                 {resetValue !== undefined && (
-                  <button
-                    className="small"
-                    title="Reset to template default"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      resetComponent(name);
-                    }}
-                  >
-                    reset
+                  <button className="small" onClick={() => resetComponent(selected)}>
+                    Reset to Default
                   </button>
                 )}
-                <button
-                  className="danger small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeComponent(name);
-                  }}
-                >
-                  ×
+                <button className="danger small" onClick={() => removeComponent(selected)}>
+                  Remove Component
                 </button>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-
-      {selected && components[selected] !== undefined && (
-        <ComponentEditor
-          key={selected}
-          name={selected}
-          data={components[selected]}
-          onChange={(data) => onChange((prev) => ({ ...prev, [selected]: data }))}
-        />
-      )}
-
-      {!showAdd ? (
-        <button onClick={() => setShowAdd(true)} disabled={availableToAdd.length === 0}>
-          + Add Component
-        </button>
-      ) : (
-        <div className="palette-add-options">
-          {availableToAdd.map((name) => (
-            <button key={name} onClick={() => addComponent(name)}>
-              {name}
-            </button>
-          ))}
-          <button onClick={() => setShowAdd(false)}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">Select a component to edit</div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
+}
+
+function componentDisplayName(name) {
+  return name.endsWith("Component") ? name.slice(0, -"Component".length) : name;
 }

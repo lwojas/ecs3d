@@ -1,26 +1,18 @@
 // Editor-only registry of known component names, so "+ Add Component"
-// has a discoverable list without importing the game's ECS component
-// classes (the editor edits authoring data, never live component
-// instances -- see ComponentEditor.jsx). This mirrors
-// scripts/services/ComponentClasses.js by name only; add a name here
-// when a new component class is registered there.
+// has a discoverable list without duplicating the game's ECS component
+// classes. Definitions come straight from each class's own
+// `static editor` metadata (see e.g. MovementComponent.js) -- this file
+// just re-keys componentClasses by name, it never redefines fields
+// itself. A component class with no `static editor` maps to `{}`, which
+// tells ComponentEditor.jsx to fall back to the generic JSON editor.
 //
-// A future entry can add a `fields` map, e.g.
-//   MovementComponent: { fields: { speed: "number", angle: "number" } }
-// to give a component its own explicit form instead of the fallback
-// JSON editor -- ComponentEditor.jsx already checks for `fields` and
-// falls back to JSON when it's absent. Nothing needs one yet.
-//
-// This file is optional by design: a component NOT listed here can
-// still be added by typing its name isn't supported today (the "Add
-// Component" list is drawn from this registry), but any component
-// already present on an entity -- known here or not -- is always
-// editable via the fallback JSON editor.
+// This file is optional by design: a component NOT listed here can't be
+// added via "+ Add Component" (that list is drawn from this registry),
+// but any component already present on an entity -- known here or not
+// -- is always editable via the fallback JSON editor.
 
 import { componentClasses } from "../../../services/ComponentClasses.js";
 
-// Fix to avoid duplicare component registration, see componentClasses.js for more details
-
 export const componentDefinitions = Object.fromEntries(
-  Object.keys(componentClasses).map((name) => [name, {}]),
+  Object.entries(componentClasses).map(([name, cls]) => [name, cls.editor ?? {}]),
 );

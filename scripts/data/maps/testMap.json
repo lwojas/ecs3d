@@ -162,13 +162,33 @@
     "5": {
       "floorHeight": 0,
       "ceilingHeight": 4,
-      "wall": {
-        "texture": "doorTexture",
+      "sections": [
+        {
+          "bottom": 0,
+          "top": 6,
+          "material": {
+            "texture": "doorTexture",
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "bottom": 6,
+          "top": 10,
+          "material": {
+            "texture": "wallTexture",
+            "width": 4,
+            "height": 4
+          }
+        }
+      ],
+
+      "floor": {
+        "texture": "floorTexture",
         "width": 4,
         "height": 4
       },
-      "floor": null,
-      "ceiling": null,
+
       "name": "door"
     }
   },
