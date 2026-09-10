@@ -1,4 +1,4 @@
-import { itemData } from "./ItemSystem.js/itemData.js";
+import { itemData } from "./ItemSystem/itemData.js";
 
 export class InteractionSystem {
   constructor(hud, gameplayManager) {
@@ -21,7 +21,9 @@ export class InteractionSystem {
   // persistent copy only matters at session/map start (see
   // GameSession.js).
   resolveEquippedItem(boundTarget) {
-    return boundTarget.entity.getComponent("InventoryComponent")?.equipped ?? null;
+    return (
+      boundTarget.entity.getComponent("InventoryComponent")?.equipped ?? null
+    );
   }
 
   setItemSystem(system) {

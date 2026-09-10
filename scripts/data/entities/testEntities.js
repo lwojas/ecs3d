@@ -106,5 +106,89 @@ export default [
       },
       "TransformComponent": {}
     }
+  },
+  {
+    "type": "door",
+    "uniqueId": "door_1",
+    "components": {
+      "DoorComponent": {
+        "state": "closed"
+      },
+      "CellComponent": {
+        "cellId": "5"
+      }
+    }
+  },
+  {
+    "type": "portal",
+    "uniqueId": "portal_1",
+    "components": {
+      "SpriteComponent": {
+        "texture": "portal",
+        "scale": 2,
+        "billboard": true,
+        "angle": 45
+      },
+      "MovementComponent": {
+        "y": 9,
+        "movable": false,
+        "x": 24
+      },
+      "CollisionComponent": {
+        "radius": 2,
+        "height": 2,
+        "layer": "TRIGGER"
+      },
+      "TriggerComponent": {
+        "once": false,
+        "onEnter": [
+          {
+            "event": "portal.activate"
+          }
+        ]
+      },
+      "PortalComponent": {
+        "name": "portal1",
+        "target": "p2",
+        "id": "p1"
+      },
+      "TransformComponent": {}
+    }
+  },
+  {
+    "type": "portal",
+    "uniqueId": "portal_2",
+    "components": {
+      "SpriteComponent": {
+        "texture": "portal",
+        "scale": 2,
+        "billboard": true,
+        "angle": 45
+      },
+      "MovementComponent": {
+        "y": 48,
+        "movable": false,
+        "x": 32
+      },
+      "CollisionComponent": {
+        "radius": 2,
+        "height": 2,
+        "layer": "TRIGGER"
+      },
+      "TriggerComponent": {
+        "once": false,
+        "onEnter": [
+          {
+            "event": "portal.activate"
+          }
+        ]
+      },
+      "PortalComponent": {
+        "name": "portal2",
+        "target": "p1",
+        "id": "p2"
+      },
+      "TransformComponent": {}
+    }
   }
 ];

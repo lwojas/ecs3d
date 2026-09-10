@@ -22,7 +22,7 @@ import { LightSystem } from "../../system/LightSystem.js";
 import { ECSBridge } from "../../system/ECSBridge.js";
 import { EventRouter } from "../../services/EventRouter.js";
 import { InteractionSystem } from "../../system/InteractionSystem.js";
-import { ItemSystem } from "../../system/ItemSystem.js/ItemSystem.js";
+import { ItemSystem } from "../../system/ItemSystem/ItemSystem.js";
 import { AISystem } from "../../system/AISystem.js";
 import { CombatSystem } from "../../system/CombatSystem.js";
 import { TriggerSystem } from "../../system/TriggerSystem.js";
@@ -36,10 +36,15 @@ import { TransformSystem } from "../../system/TransformSystem.js";
 import { ServiceLocator } from "../../services/ServiceLocator.js";
 import { ParticleSystem } from "../../system/Particles/ParticleSystem.js";
 import { PARTICLE_CONFIG } from "../../system/Particles/ParticleConfig.js";
-import { BloodSplat } from "../../system/Particles/BloodSplat.js";
+import {
+  BloodSplat,
+  PortalParticles,
+} from "../../system/Particles/BloodSplat.js";
 import { AudioAPI } from "../audio/AudioApi.js";
 import { PickupSystem } from "../../system/PickupSystem.js";
 import { ConditionalChecker } from "../../tools/conditionChecker.js";
+import { CellSystem } from "../../system/CellSystem.js";
+import { PortalSystem } from "../../system/PortalSystem.js";
 
 function createDefaultRaycaster(game, mapData) {
   const raycaster = new Raycaster(game, mapData, {
@@ -52,6 +57,8 @@ function createDefaultRaycaster(game, mapData) {
     fov: Math.PI / 3,
     maxDistance: 1000,
     renderer: "wasm",
+    debug: false,
+    debugSpriteAnchors: false,
   });
   raycaster.resizeToCamera();
   return raycaster;
@@ -243,9 +250,12 @@ export class MapWorld {
     this.ecs = new ECSBridge();
 
     this.hud = new HUD(this.game);
+    this.gameplayManager.setHud(this.hud);
     this.hud.items.registerAll(hudItems);
     this.inventorySystem.registerHud(this.hud);
     this.conditionalChecker = new ConditionalChecker(this.inventorySystem);
+    this.cellSystem = new CellSystem(this.raycaster);
+    this.humanPlayers = [];
 
     this.gameplayManager.players.forEach((user) => {
       // Bots have no local camera/input to bind -- without this, the
@@ -256,12 +266,13 @@ export class MapWorld {
       );
       if (sessionPlayer?.controller === "bot") return;
 
+      this.humanPlayers.push(registerUser(user.id));
+
       this.audio = new AudioAPI({
         userId: user.id,
       });
       this.eventRouter.registerAudioSystem(this.audio);
 
-      registerUser(user.id);
       const playerMovement = this.playerEntities
         .get(user.id)
         ?.getComponent("MovementComponent");
@@ -293,7 +304,14 @@ export class MapWorld {
       this.cameraRenderer,
     );
     this.bloodSplat = new BloodSplat(this.particleSystem, { count: 12 });
-
+    this.portalEffect = new PortalParticles(this.particleSystem, {
+      count: 128,
+    });
+    this.portalSystem = new PortalSystem(
+      this.cameraRenderer,
+      this.portalEffect,
+    );
+    this.eventRouter.registerPortalSystem(this.portalSystem);
     this.movementSystem = new MovementSystem(this.raycaster);
     this.spriteSystem = new SpriteSystem(this.cameraRenderer);
     this.collisionSystem = new CollisionSystem(this.cameraRenderer);
@@ -304,12 +322,14 @@ export class MapWorld {
     );
     this.combatSystem = new CombatSystem(
       this.ecs,
+      this.hud,
       this.collisionSystem.collisionEvents,
       this.bloodSplat,
     );
     this.lightSystem = new LightSystem(this.cameraRenderer);
     this.triggerSystem = new TriggerSystem(
       this.collisionSystem.collisionEvents,
+      this.conditionalChecker,
     );
     this.itemSystem = new ItemSystem(this.hud, this.projectileSystem);
     this.interactionSystem.setItemSystem(this.itemSystem);
@@ -424,6 +444,7 @@ export class MapWorld {
   // Only tears down this map's world -- GameplaySession's Gameplay,
   // Rules and Users are untouched and outlive this instance.
   destroy() {
+    this.inputController?.disableMouseLook();
     this.rules.detachWorld?.();
     ServiceLocator.shutDown();
 

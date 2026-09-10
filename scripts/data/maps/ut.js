@@ -1,0 +1,94 @@
+// AUTO-GENERATED from ut.json by tools/build-data.js -- do not edit by hand.
+export default {
+  "width": 32,
+  "height": 16,
+  "defaultCeilingHeight": 2.5,
+  "defaultFloorHeight": 0,
+  "cellSize": 4,
+  "ambient": 0.3,
+  "sky": {
+    "texture": ""
+  },
+  "map": [
+    "11111111111111111111111111111111",
+    "12222221112222222222222222222221",
+    "12222222222222222222222222222221",
+    "12222222222222222222222222222221",
+    "12222222222222222002222220022221",
+    "12222000000000000000002220022221",
+    "12222000000000000000000000022221",
+    "12222000000000000000000000022221",
+    "12222000000000000000000000022221",
+    "12222000000000000000000000022221",
+    "12222000000000000000000000022221",
+    "12222002222222222222222222222221",
+    "12222222222222222222222222222221",
+    "12222222222222222222222222222221",
+    "12222222222222221112222222222221",
+    "11111111111111111111111111111111"
+  ],
+  "cells": {
+    "0": {
+      "name": "Empty",
+      "floorHeight": 0,
+      "ceilingHeight": 32,
+      "wall": null,
+      "floor": {
+        "texture": "floorTexture",
+        "width": 4,
+        "height": 4
+      },
+      "ceiling": {
+        "texture": "brickTexture",
+        "width": 4,
+        "height": 4
+      },
+      "blocking": false
+    },
+    "1": {
+      "name": "Outerwall",
+      "floorHeight": 0,
+      "ceilingHeight": 32,
+      "wall": {
+        "texture": "brickTexture",
+        "width": 4,
+        "height": 4
+      },
+      "floor": null,
+      "ceiling": {
+        "texture": "brickTexture",
+        "width": 4,
+        "height": 4
+      }
+    },
+    "2": {
+      "floorHeight": 0,
+      "ceilingHeight": 32,
+      "wall": null,
+      "floor": {
+        "texture": "wallTexture",
+        "width": 4,
+        "height": 4
+      },
+      "ceiling": {
+        "texture": "brickTexture",
+        "width": 4,
+        "height": 4
+      },
+      "blocking": false,
+      "sections": [
+        {
+          "bottom": 16,
+          "top": 18,
+          "material": {
+            "texture": "doorTexture",
+            "width": 4,
+            "height": 4
+          }
+        }
+      ]
+    }
+  },
+  "spawnPoints": {},
+  "spawnZones": {}
+};

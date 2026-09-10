@@ -3,6 +3,7 @@ import { Whiteroom } from "./level-whiteroom.js";
 import { SinglePlayerWhiteroom } from "./level-singleplayer-whiteroom.js";
 import { MultiplayerWhiteroom } from "./level-multiplayer-whiteroom.js";
 import { GameMenu } from "./ui/GameMenu.js";
+import { Scoreboard } from "./ui/Scoreboard.js";
 
 // Which Phaser state hosts a given gameMode's gameplay -- the only
 // mapping the application layer needs; everything else about a mode
@@ -36,6 +37,9 @@ BasicGame.Boot.prototype = {
     this.load.image("health", "assets/items/health.png");
     this.load.image("keyRed", "assets/items/key_red.png");
     this.load.image("bloodDrop", "assets/particles/blood.png");
+    this.load.image("portal", "assets/mapObjects/portal.png");
+    this.load.image("enemy1", "assets/npc/cobra0.png");
+    this.load.image("portalParticle", "assets/particles/portalParticle.png");
 
     // Audio
     this.load.audio("sfx_pickup", "assets/audio/gui/positive.wav");
@@ -87,7 +91,7 @@ BasicGame.Menu.prototype = {
 // tears a running session down to return to the menu. The menu itself
 // never constructs any of this -- see GameMenu.js.
 function startGameplay(sessionConfig) {
-  new GameplaySession(sessionConfig);
+  new GameplaySession(sessionConfig, { onGameOver: showScoreboard });
   gameMenu.hide();
   game.state.start(
     STATE_BY_MODE[sessionConfig.gameMode] ?? DEFAULT_GAMEPLAY_STATE,
@@ -99,12 +103,30 @@ function returnToMenu() {
   gameMenu.show();
 }
 
+// gameplay.finish() (see Gameplay.js) is the one funnel every rule's
+// game-over routes through -- GameplaySession's onGameOver callback
+// fires this the instant a session ends, so nothing here needs to poll
+// gameplay state per frame.
+function showScoreboard(outcome) {
+  game.state.start("Menu"); // tears down the current MapWorld, same as returnToMenu()
+  scoreboard.show(outcome);
+}
+
+function restartToMenu() {
+  scoreboard.hide();
+  returnToMenu();
+}
+
 let gameMenu;
+let scoreboard;
 
 // Add game states and start the game
 window.onload = function () {
   gameMenu = new GameMenu(document.getElementById("game-menu"), {
     onStart: startGameplay,
+  });
+  scoreboard = new Scoreboard(document.getElementById("scoreboard"), {
+    onRestart: restartToMenu,
   });
 
   // Minimal, event-driven (not polled) way back to the menu from

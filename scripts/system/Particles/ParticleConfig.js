@@ -130,4 +130,37 @@ export const PARTICLE_CONFIG = {
 
     gravity: 10,
   },
+
+  portal: {
+    texture: "portalParticle",
+
+    width: 0.3,
+    height: 0.3,
+
+    scale: 2,
+
+    lifetime: {
+      min: 0.5,
+      max: 0.7,
+    },
+
+    velocity: {
+      x: {
+        min: -10,
+        max: 10,
+      },
+
+      y: {
+        min: -10,
+        max: 10,
+      },
+
+      z: {
+        min: 5,
+        max: 8,
+      },
+    },
+
+    gravity: -1,
+  },
 };

@@ -25,9 +25,15 @@ export class EventRouter {
     this.inventorySystem = null;
     this.audioSystem = null;
     this.pickupSystem = null;
+    this.portalSystem = null;
 
     this.eventBus.on("lights.set", (data) => this.handleLightsSet(data));
     this.eventBus.on("resource.add", (data) => this.consumePickup(data));
+    this.eventBus.on("portal.activate", (data) => this.beginTeleport(data));
+  }
+
+  registerPortalSystem(system) {
+    this.portalSystem = system;
   }
 
   registerHud(hud) {
@@ -50,6 +56,10 @@ export class EventRouter {
 
   registerAudioSystem(system) {
     this.audioSystem = system;
+  }
+
+  beginTeleport(data) {
+    this.portalSystem.beginTeleport(data);
   }
 
   handleLightsSet(data) {

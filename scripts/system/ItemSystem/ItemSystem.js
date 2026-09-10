@@ -52,7 +52,7 @@ export class ItemSystem extends System {
       }
       let fireRateModifier = 0;
       if (enemyTarget) {
-        this.fireToTarget(item, boundTarget, enemyTarget);
+        this.fireToTarget(item, boundTarget, enemyTarget, itemComponent);
         fireRateModifier = 2; // Move this to component
       } else {
         this.fireFromCamera(item, boundTarget, {
@@ -143,8 +143,11 @@ export class ItemSystem extends System {
       rightY * right +
       upY * up;
 
+    // boundTarget is always the human player here (see fireWeapon) -- its
+    // z is the base/standing height (MovementSystem's convention), so the
+    // muzzle sits +2 above it, roughly chest height.
     const z =
-      boundTarget.z -
+      boundTarget.z +
       2 +
       directionZ * (distance + forward) +
       rightZ * right +
@@ -162,7 +165,7 @@ export class ItemSystem extends System {
     );
   }
 
-  fireToTarget(item, boundTarget, enemyTarget) {
+  fireToTarget(item, boundTarget, enemyTarget, itemComponent) {
     const distance = 2;
 
     const dx = enemyTarget.x - boundTarget.x;
@@ -171,7 +174,9 @@ export class ItemSystem extends System {
 
     const x = boundTarget.x + (dx / length) * distance;
     const y = boundTarget.y + (dy / length) * distance;
-    const z = boundTarget.z - 2;
+    // Per-entity, so different enemies can fire from different heights
+    // (see ItemComponent.fireOffsetZ).
+    const z = boundTarget.z + (itemComponent?.fireOffsetZ ?? -2);
 
     this.projectileSystem.fireAtTarget(
       item.projectile,
@@ -180,7 +185,10 @@ export class ItemSystem extends System {
       z,
       enemyTarget.x,
       enemyTarget.y,
-      enemyTarget.z - 2,
+      // enemyTarget is whatever hostile actor the AI is targeting -- in
+      // practice always the human player -- so aim at chest height above
+      // its base/standing z, same convention as fireFromCamera above.
+      enemyTarget.z + 2,
       boundTarget,
     );
   }

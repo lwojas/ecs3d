@@ -169,6 +169,33 @@ input[type="number"] {
   color: #6c7078;
 }
 
+.wave-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wave-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #24272d;
+}
+
+.wave-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.wave-row-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a8f98;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -214,4 +241,79 @@ button {
 
 .btn-primary:hover {
   background: #ffc474;
+}
+
+/* #scoreboard reuses #game-menu's overlay/palette so the two screens
+   read as one cohesive UI. */
+#scoreboard {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: #14161a;
+  color: #e6e6e6;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#scoreboard[hidden] {
+  display: none;
+}
+
+.scoreboard-panel {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #2a2d33;
+  background: #1b1e24;
+  border-radius: 6px;
+  padding: 28px 24px;
+}
+
+.scoreboard-title {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scoreboard-title--win {
+  color: #ffb454;
+}
+
+.scoreboard-title--loss {
+  color: #d98c8c;
+}
+
+.scoreboard-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #8a8f98;
+}
+
+.scoreboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.scoreboard-table th,
+.scoreboard-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #24272d;
+  color: #b8bcc4;
+}
+
+.scoreboard-table th {
+  color: #8a8f98;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
 }

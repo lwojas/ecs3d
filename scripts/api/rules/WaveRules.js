@@ -1,11 +1,16 @@
 import { GameRules } from "./GameRules.js";
 
-// Case B's minimal rules: on start, request each configured wave's
-// entities through the same EntitySpawner every other spawn path uses.
-// Deliberately dumb -- every wave spawns immediately, there's no
-// wave-clear/timing logic. Just the "rules can request entities
-// dynamically through the spawning mechanism" seam; a real wave director
-// (timing, escalation, clear-to-advance) is future work.
+// Sequential wave defence: waves spawn one at a time, advancing only once
+// the current wave's enemies are all dead. A player death clears whatever
+// is left standing and restarts from wave 1; running out of lives or
+// clearing every wave ends the session via gameplay.finish().
+//
+// Kills/deaths route through the single "entity.killed" message (emitted
+// once, on the alive->dead transition, by CombatSystem) rather than every
+// rule re-deriving death from "entity.damaged" + a health check -- see
+// onEntityKilled(). gameplay.score/gameplay.lives use a generic,
+// player-id-keyed shape so other rule types can adopt the same
+// convention later without a different shape to reconcile.
 export class WaveRules extends GameRules {
   // `defaultSpawnZone` is WaveRules' own convention for "where enemies
   // enter the world absent a more specific decision" -- not something
@@ -15,36 +20,28 @@ export class WaveRules extends GameRules {
   // a future version of resolveSpawnZone() can replace the convention
   // entirely (round-robin, player-proximity, difficulty-based, ...)
   // without any caller -- menu or session config -- needing to change.
-  constructor({ waves = [], defaultSpawnZone = "courtyard" } = {}) {
+  constructor({ waves = [], defaultSpawnZone = "courtyard", lives = 3 } = {}) {
     super();
     this.waves = waves;
     this.defaultSpawnZone = defaultSpawnZone;
+    this.startingLives = lives;
     this.spawner = null;
     this.mapData = null;
+    this.activeEnemies = [];
+    this.waveIndex = 0;
   }
 
   events = {
-    "player.died": "onPlayerDied",
-    "entity.moving": "onPlayerDied",
-    "entity.damaged": "onEntityDamaged",
+    "entity.killed": "onEntityKilled",
   };
 
-  onEntityDamaged(gameplay, message) {
-    const entity = message.target.entity;
-    // console.log(gameplay, message.currentHealth, message.target);
-    if (message.currentHealth <= 0) {
-      entity.disable();
-    }
-    const player = gameplay.getPlayer(entity.id);
-    // if (player.)
-    // console.log(player);
-    if (player && message.currentHealth <= 0) {
-      gameplay.addAction({
-        type: "player.respawn",
-        playerId: player.id,
-        spawn: this.config.spawn,
-        restoreState: this.config.respawn.restorePlayerState,
-      });
+  // Session-scoped: fires once, before the first map's waves spawn.
+  // gameplay.score/gameplay.lives are shared Gameplay concepts (see
+  // Gameplay.js) -- WaveRules just owns seeding them for this mode.
+  onStart(gameplay) {
+    for (const player of gameplay.players) {
+      gameplay.lives[player.id] = this.startingLives;
+      gameplay.score[player.id] = { kills: 0, deaths: 0 };
     }
   }
 
@@ -70,14 +67,104 @@ export class WaveRules extends GameRules {
   // session setup; per-map spawning belongs here so a second map on the
   // same session gets its waves too.
   onMapLoaded(gameplay, map) {
-    for (const wave of this.waves) {
-      this.spawnWave(wave);
+    this.waveIndex = 0;
+    this.activeEnemies = [];
+    this.startWave(gameplay, 0);
+  }
+
+  onEntityKilled(gameplay, message) {
+    const victim = message.target.entity;
+    const responsible = message.source?.entity ?? null;
+
+    victim.disable();
+
+    const player = gameplay.getPlayer(victim.id);
+    if (player) {
+      this.onPlayerKilled(gameplay, player, responsible);
+    } else {
+      this.onEnemyKilled(gameplay, victim, responsible);
     }
   }
 
-  spawnWave(wave) {
-    // console.log(this.mapData.spawnPoints);
+  onPlayerKilled(gameplay, player, killer) {
+    const score = gameplay.score[player.id];
+    score.deaths += 1;
 
+    const wave = this.waveIndex + 1;
+    const killerId = killer?.id ?? "unknown";
+    console.log(
+      `[WaveRules] ${player.id} was killed by ${killerId} on wave ${wave}`,
+    );
+    gameplay.hud?.notify(`${player.id} was killed by ${killerId}`);
+
+    this.clearActiveEnemies();
+
+    gameplay.lives[player.id] -= 1;
+    if (gameplay.lives[player.id] <= 0) {
+      this.endGame(gameplay, "defeat");
+      return;
+    }
+
+    gameplay.addAction({
+      type: "player.respawn",
+      playerId: player.id,
+    });
+
+    this.startWave(gameplay, 0);
+  }
+
+  onEnemyKilled(gameplay, enemy, killer) {
+    this.activeEnemies = this.activeEnemies.filter((active) => active !== enemy);
+
+    const player = killer && gameplay.getPlayer(killer.id);
+    if (player) {
+      const score = gameplay.score[player.id];
+      score.kills += 1;
+
+      const wave = this.waveIndex + 1;
+      console.log(
+        `[WaveRules] ${player.id} killed ${enemy.id} on wave ${wave} (${score.kills} kills)`,
+      );
+      gameplay.hud?.notify(`${player.id} killed ${enemy.id}`);
+    }
+
+    if (this.activeEnemies.length === 0) {
+      this.advanceWave(gameplay);
+    }
+  }
+
+  advanceWave(gameplay) {
+    const nextIndex = this.waveIndex + 1;
+    if (nextIndex >= this.waves.length) {
+      this.endGame(gameplay, "victory");
+      return;
+    }
+    this.startWave(gameplay, nextIndex);
+  }
+
+  startWave(gameplay, index) {
+    this.waveIndex = index;
+    const wave = this.waves[index];
+    if (!wave) return;
+    this.spawnWave(wave);
+  }
+
+  clearActiveEnemies() {
+    this.activeEnemies.forEach((enemy) => enemy.disable());
+    this.activeEnemies = [];
+  }
+
+  endGame(gameplay, result) {
+    this.clearActiveEnemies();
+    gameplay.finish({
+      result,
+      wave: this.waveIndex + 1,
+      totalWaves: this.waves.length,
+      score: { ...gameplay.score },
+    });
+  }
+
+  spawnWave(wave) {
     if (!this.mapData.spawnPoints.enemyStart) {
       console.log("No enemy start found, aborting wave spawn");
       return;
@@ -85,14 +172,16 @@ export class WaveRules extends GameRules {
     if (!this.spawner) return;
 
     const count = wave.count ?? 1;
-    const spawnZone = "hostiles";
+    const spawnZone = this.resolveSpawnZone(wave);
     for (let i = 0; i < count; i++) {
-      this.spawner.spawn({
-        prefab: wave.prefab,
-        spawnZone,
-        spawnPoint: wave.spawnPoint,
-        modifiers: wave.modifiers,
-      });
+      this.activeEnemies.push(
+        this.spawner.spawn({
+          prefab: wave.prefab,
+          spawnZone,
+          spawnPoint: wave.spawnPoint,
+          modifiers: wave.modifiers,
+        }),
+      );
     }
   }
 

@@ -2,9 +2,11 @@
 import arenaDeathmatch from "./arenaDeathmatch.js";
 import outpostWave from "./outpostWave.js";
 import testMap from "./testMap.js";
+import ut from "./ut.js";
 
 export const maps = {
   "arenaDeathmatch": arenaDeathmatch,
   "outpostWave": outpostWave,
   "testMap": testMap,
+  "ut": ut,
 };

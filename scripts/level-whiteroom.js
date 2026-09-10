@@ -25,7 +25,7 @@ import { LightSystem } from "./system/LightSystem.js";
 import { ServiceLocator } from "./services/ServiceLocator.js";
 import { ECSBridge } from "./system/ECSBridge.js";
 import { InteractionSystem } from "./system/InteractionSystem.js";
-import { ItemSystem } from "./system/ItemSystem.js/ItemSystem.js";
+import { ItemSystem } from "./system/ItemSystem/ItemSystem.js";
 import { AISystem } from "./system/AISystem.js";
 import { CombatSystem } from "./system/CombatSystem.js";
 
@@ -38,7 +38,10 @@ export class Whiteroom {
     this.entityManager = new EntityManager();
 
     // Generate entities from Json
-    const prefabFactory = new PrefabFactory(this.entityManager, componentDefaults);
+    const prefabFactory = new PrefabFactory(
+      this.entityManager,
+      componentDefaults,
+    );
     this.entities = testLevel.entities.map((entityData) =>
       prefabFactory.createEntity(entityData),
     );
@@ -90,7 +93,7 @@ export class Whiteroom {
       setAllBindings(user.id, this.player);
     });
 
-    this.movementSystem = new MovementSystem(this.raycaster, this.entities);
+    this.movementSystem = new MovementSystem(this.raycaster);
     this.spriteSystem = new SpriteSystem(this.cameraRenderer);
     this.collisionSystem = new CollisionSystem(this.cameraRenderer);
     this.projectileSystem = new ProjectileSystem(

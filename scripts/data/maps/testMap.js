@@ -19,7 +19,7 @@ export default {
     "1000040001000001",
     "1000010001000001",
     "1000010301000001",
-    "1000010001000001",
+    "1000010601000001",
     "1000015222000001",
     "1000000000000001",
     "1000000000000001",
@@ -162,7 +162,7 @@ export default {
     },
     "5": {
       "floorHeight": 0,
-      "ceilingHeight": 4,
+      "ceilingHeight": 8,
       "sections": [
         {
           "bottom": 0,
@@ -175,7 +175,7 @@ export default {
         },
         {
           "bottom": 6,
-          "top": 10,
+          "top": 8,
           "material": {
             "texture": "wallTexture",
             "width": 4,
@@ -183,12 +183,46 @@ export default {
           }
         }
       ],
+      "ceiling": {
+        "texture": "ceilingTexture",
+        "width": 4,
+        "height": 4
+      },
       "floor": {
         "texture": "floorTexture",
         "width": 4,
         "height": 4
       },
       "name": "door"
+    },
+    "6": {
+      "name": "Wall",
+      "blocking": false,
+      "floorHeight": 0,
+      "ceilingHeight": 10,
+      "wall": {
+        "texture": "wallTexture",
+        "width": 4,
+        "height": 4
+      },
+      "floor": {
+        "texture": "floorTexture",
+        "width": 4,
+        "height": 4
+      },
+      "ceiling": {
+        "texture": "ceilingTexture",
+        "width": 4,
+        "height": 4
+      },
+      "fog": {
+        "distance": 24,
+        "color": {
+          "r": 29,
+          "g": 6,
+          "b": 6
+        }
+      }
     }
   },
   "spawnPoints": {

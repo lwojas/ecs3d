@@ -16,7 +16,7 @@ export class Entity {
   disable() {
     for (let componentName in this.components) {
       const component = this.components[componentName];
-      console.log(component);
+      // console.log(component);
       if (component.enabled) {
         component.enabled = false;
       }

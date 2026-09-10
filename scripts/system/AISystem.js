@@ -23,8 +23,9 @@ const PREFER_STICKY_TARGET = true;
 
 // Perceives, decides and moves any entity with an AIComponent +
 // MovementComponent. Capabilities beyond that (attacking, animation,
-// patrolling) come from whichever other components the entity also has --
-// this system never assumes an enemy/NPC split beyond AIComponent.disposition.
+// patrolling, omniscient hunting -- see HuntingComponent) come from
+// whichever other components the entity also has -- this system never
+// assumes an enemy/NPC split beyond AIComponent.disposition.
 //
 //   AISystem -> movement/facing intent -> MovementComponent -> MoveSystem/CollisionSystem
 //   AISystem -> attack intent -> ItemSystem -> ProjectileSystem
@@ -47,11 +48,6 @@ export class AISystem extends System {
     // `this` would have the second call silently overwrite the first
     // (this.entities would end up filtered by ActorComponent instead of
     // AIComponent+MovementComponent).
-    this.actorRegistry = {};
-    this.actorRegistry.entities = this.entityManager.registerSystem(
-      this.actorRegistry,
-      ["ActorComponent"],
-    );
 
     this.refreshList();
   }
@@ -61,6 +57,19 @@ export class AISystem extends System {
   // (see System.refreshList / EntityManager.updateEntityLists), so newly
   // spawned or removed AI entities stay in sync.
   refreshList() {
+    this.actorRegistry = {};
+    this.actorRegistry.entities = this.entityManager.registerSystem(
+      this.actorRegistry,
+      ["ActorComponent"],
+    );
+    this.actorList = resolveComponentList(
+      "ActorComponent",
+      this.actorRegistry.entities,
+    );
+    this.actorMovementList = resolveComponentList(
+      "MovementComponent",
+      this.actorRegistry.entities,
+    );
     console.log("refreshing AI system");
     this.aiList = resolveComponentList("AIComponent", this.entities);
     this.movementList = resolveComponentList(
@@ -70,6 +79,7 @@ export class AISystem extends System {
     this.spriteList = resolveComponentList("SpriteComponent", this.entities);
     this.itemList = resolveComponentList("ItemComponent", this.entities);
     this.patrolList = resolveComponentList("PatrolComponent", this.entities);
+    this.huntingList = resolveComponentList("HuntingComponent", this.entities);
     this.actorSelfList = resolveComponentList("ActorComponent", this.entities);
   }
 
@@ -82,12 +92,12 @@ export class AISystem extends System {
     // pool every AI entity perceives against this tick. actorRegistry.entities
     // is kept current by EntityManager as the world changes, so this stays
     // cheap and correct without a bespoke refresh hook.
-    const actorEntities = this.actorRegistry.entities;
-    const actorList = resolveComponentList("ActorComponent", actorEntities);
-    const actorMovementList = resolveComponentList(
-      "MovementComponent",
-      actorEntities,
-    );
+    // const actorEntities = this.actorRegistry.entities;
+
+    // Nonsense moved to refresh lists
+
+    const actorList = this.actorList;
+    const actorMovementList = this.actorMovementList;
 
     for (let i = 0; i < len; i++) {
       const ai = aiList[i];
@@ -99,6 +109,7 @@ export class AISystem extends System {
       const sprite = this.spriteList[i];
       const item = this.itemList[i];
       const patrol = this.patrolList[i];
+      const hunting = this.huntingList[i];
       const selfActor = this.actorSelfList[i];
 
       ai.decisionTimer -= delta;
@@ -110,6 +121,7 @@ export class AISystem extends System {
           selfActor,
           actorList,
           actorMovementList,
+          hunting,
           ecs,
         );
         this.decideState(ai, movement, item, patrol, ecs);
@@ -147,7 +159,14 @@ export class AISystem extends System {
       this.isWithinFieldOfView(movement, dx, dy, ai.fieldOfView) &&
       this.raycaster.checkVisibility(
         { x: movement.x, y: movement.y, z: movement.z },
-        { x: targetMovement.x, y: targetMovement.y, z: targetMovement.z },
+        {
+          x: targetMovement.x,
+          y: targetMovement.y,
+          // targetMovement.z is the target's base/standing height -- lift
+          // the LOS check to roughly eye level so a knee-high obstacle
+          // doesn't block sight of a target standing behind it.
+          z: targetMovement.z + this.raycaster.cameraHeight,
+        },
       ).visible
     );
   }
@@ -221,12 +240,66 @@ export class AISystem extends System {
     return candidateMovement;
   }
 
+  // Omniscient counterpart to findVisibleTarget() -- for a HuntingComponent
+  // entity, "is there a hostile" is the only question; viewDistance,
+  // fieldOfView and line of sight never gate it. Kept as its own method
+  // (not a flag threaded through findVisibleTarget/canPerceive) so the
+  // normal perception path stays exactly as readable as it was.
+  findHuntTarget(ai, movement, selfActor, actorList, actorMovementList) {
+    if (!selfActor) return null;
+
+    if (PREFER_STICKY_TARGET) {
+      const sticky = this.getStickyHuntTarget(ai, selfActor);
+      if (sticky) return sticky;
+    }
+
+    let best = null;
+    let bestDistanceSq = Infinity;
+
+    for (let i = 0; i < actorList.length; i++) {
+      const candidateActor = actorList[i];
+      const candidateMovement = actorMovementList[i];
+
+      if (!candidateActor || !candidateMovement) continue;
+      if (candidateActor.entity === movement.entity) continue;
+      if (!this.isHostile(selfActor, candidateActor)) continue;
+
+      const dx = candidateMovement.x - movement.x;
+      const dy = candidateMovement.y - movement.y;
+      const distanceSq = dx * dx + dy * dy;
+
+      if (distanceSq >= bestDistanceSq) continue;
+
+      bestDistanceSq = distanceSq;
+      best = candidateMovement;
+    }
+
+    return best;
+  }
+
+  // Hunting's counterpart to getStickyTarget() -- same "keep the current
+  // target rather than re-picking nearest every tick" rule, but without
+  // the perceive gate: a hunting AI doesn't need line of sight/FOV/range
+  // to know a hostile it already locked onto is still there.
+  getStickyHuntTarget(ai, selfActor) {
+    const targetEntity = ai.targetEntity;
+    if (!targetEntity || !targetEntity.isEnabled) return null;
+
+    const candidateActor = targetEntity.getComponent("ActorComponent");
+    const candidateMovement = targetEntity.getComponent("MovementComponent");
+    if (!candidateActor || !candidateMovement) return null;
+    if (!this.isHostile(selfActor, candidateActor)) return null;
+
+    return candidateMovement;
+  }
+
   evaluatePerception(
     ai,
     movement,
     selfActor,
     actorList,
     actorMovementList,
+    hunting,
     ecs,
   ) {
     if (ai.disposition !== "enemy") {
@@ -234,15 +307,18 @@ export class AISystem extends System {
       return;
     }
 
-    const target = this.findVisibleTarget(
-      ai,
-      movement,
-      selfActor,
-      actorList,
-      actorMovementList,
-    );
+    const target = hunting
+      ? this.findHuntTarget(ai, movement, selfActor, actorList, actorMovementList)
+      : this.findVisibleTarget(
+          ai,
+          movement,
+          selfActor,
+          actorList,
+          actorMovementList,
+        );
 
     if (target) {
+      if (!target.enabled) return;
       if (ai.targetEntity !== target.entity) {
         this.emitMessage(ecs, "ai.target.detected", movement, {
           targetId: target.entity.id,

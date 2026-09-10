@@ -1,52 +1,37 @@
-import { runtimeBindings, getBindings } from "../tools/runtimeBindings.js";
+import { getBindings } from "../tools/runtimeBindings.js";
 
 export class CameraRenderer {
   constructor(raycaster, userId) {
     this.runtimeBindings = getBindings(userId);
+
     this.raycaster = raycaster;
+
     this.boundCamera = this.runtimeBindings.boundCamera;
+
     this.sprites = [];
     this.lights = [];
-    // Debug-only wireframe shapes (see Raycaster.renderDebugWireframes /
-    // CollisionSystem.debug). Same array-per-frame contract as sprites/lights.
     this.debugObjects = [];
+
     this.ambient = 0.35;
-    // This frame's lighting at the camera's own position -- for callers
-    // that light something the raycaster never sees, e.g. a first-person
-    // weapon/item viewmodel drawn as an ordinary 2D sprite rather than a
-    // camera.sprites entry (see ItemRegistry.setLightTint()). Computed via
-    // raycaster.lastLighting so it doesn't re-resolve camera.lights a
-    // second time. {r:1,g:1,b:1} (a no-op multiplier) until the first
-    // render happens.
-    this.viewmodelLight = { r: 1, g: 1, b: 1 };
+
+    this.viewmodelLight = {
+      r: 1,
+      g: 1,
+      b: 1,
+    };
+
+    this.renderZ = null;
+
+    // Reused every frame as the input to createCameraSnapshot() instead of
+    // spreading `target` into a fresh object -- avoids both the allocation
+    // and copying fields (speed, moveX, verticalVelocity, ...) the
+    // raycaster never reads.
+    this.cameraInput = { x: 0, y: 0, z: 0, angle: 0 };
   }
 
-  // update() {
-  //   const target = this.runtimeBindings.boundCamera;
-  //   if (!target) return;
-  //   target.z = this.raycaster.getEyeHeightWorld(target.x, target.y);
-  //   // this.boundCamera = target;
-  //   const camera = this.raycaster.createCameraSnapshot(target);
-  //   camera.pitch = target.viewAngle;
-  //   camera.sprites = this.sprites;
-  //   camera.lights = this.lights;
-  //   camera.debugObjects = this.debugObjects;
-  //   camera.ambient = this.ambient;
-  //   this.raycaster.renderSnapshot(camera);
-
-  //   const { ambient, lights } = this.raycaster.lastLighting;
-  //   this.viewmodelLight = this.raycaster.sampleLightRgb(
-  //     target.x,
-  //     target.y,
-  //     target.z,
-  //     ambient,
-  //     lights,
-  //   );
-
-  //   this.sprites.length = 0;
-  //   this.lights.length = 0;
-  //   this.debugObjects.length = 0;
-  // }
+  resetCameraZ() {
+    this.renderZ = null;
+  }
 
   update(delta) {
     const target = this.runtimeBindings.boundCamera;
@@ -55,15 +40,36 @@ export class CameraRenderer {
       return;
     }
 
-    const targetZ = this.raycaster.getEyeHeightWorld(target.x, target.y);
+    // MovementSystem owns target.z (the entity's physical base/standing
+    // height, shared with every other movable entity). CameraRenderer only
+    // smooths its own rendered eye height and must never write back to it.
+    const eyeZ = target.z + this.raycaster.cameraHeight;
 
-    // Smoothly move the camera toward the surface height.
-    const zSpeed = 8;
-    const dz = targetZ - target.z;
+    if (this.renderZ === null) {
+      this.renderZ = eyeZ;
+    } else {
+      const dz = eyeZ - this.renderZ;
 
-    target.z += Math.sign(dz) * Math.min(Math.abs(dz), zSpeed * delta);
+      if (dz > 0) {
+        // Stepping up onto a higher surface (stairs) is an instant snap in
+        // MovementSystem -- soften the pop instead of popping the camera.
+        const zSpeed = 8;
+        this.renderZ += Math.min(dz, zSpeed * delta);
+      } else {
+        // Falling is already a real, accelerating gravity curve from
+        // MovementSystem -- don't cap it, or the camera lags behind the
+        // actual fall speed.
+        this.renderZ = eyeZ;
+      }
+    }
 
-    const camera = this.raycaster.createCameraSnapshot(target);
+    const input = this.cameraInput;
+    input.x = target.x;
+    input.y = target.y;
+    input.z = this.renderZ;
+    input.angle = target.angle;
+
+    const camera = this.raycaster.createCameraSnapshot(input);
 
     camera.pitch = target.viewAngle;
     camera.sprites = this.sprites;
@@ -78,7 +84,7 @@ export class CameraRenderer {
     this.viewmodelLight = this.raycaster.sampleLightRgb(
       target.x,
       target.y,
-      target.z,
+      this.renderZ,
       ambient,
       lights,
     );

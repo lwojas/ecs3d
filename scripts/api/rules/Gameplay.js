@@ -8,7 +8,7 @@ export const GameplayState = Object.freeze({
 });
 
 export class Gameplay {
-  constructor({ rules } = {}) {
+  constructor({ rules, onGameOver } = {}) {
     if (!rules) {
       throw new Error("Gameplay requires a rules implementation");
     }
@@ -16,6 +16,7 @@ export class Gameplay {
     ServiceLocator.register("system", "GameplayManager", this);
 
     this.rules = rules;
+    this.onGameOver = onGameOver;
 
     this.hud = null;
 
@@ -29,6 +30,7 @@ export class Gameplay {
     this.players = [];
     this.teams = [];
     this.score = {};
+    this.lives = {};
     this.objectives = [];
 
     // Messages received during the current processing cycle.
@@ -97,6 +99,7 @@ export class Gameplay {
     this.state = GameplayState.GAME_OVER;
 
     this.rules.onGameOver?.(this, outcome);
+    this.onGameOver?.(outcome);
   }
 
   pause() {

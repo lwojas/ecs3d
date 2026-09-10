@@ -1,0 +1,66 @@
+// AUTO-GENERATED from utEnemies.json by tools/build-data.js -- do not edit by hand.
+export default [
+  {
+    "type": "player",
+    "uniqueId": "player-1",
+    "components": {
+      "MovementComponent": {
+        "z": 18
+      },
+      "ItemComponent": {},
+      "InventoryComponent": {
+        "equipped": "pistol"
+      },
+      "HealthComponent": {},
+      "ActorComponent": {},
+      "CollisionComponent": {
+        "radius": 0.5,
+        "offsetZ": 1,
+        "layer": "PLAYER",
+        "mask": [
+          "NPC",
+          "PROJECTILE",
+          "TRIGGER"
+        ]
+      },
+      "HudComponent": {}
+    }
+  },
+  {
+    "type": "portal",
+    "uniqueId": "portal_1",
+    "components": {
+      "SpriteComponent": {
+        "texture": "portal",
+        "scale": 2,
+        "billboard": true,
+        "angle": 45
+      },
+      "MovementComponent": {
+        "z": 0,
+        "y": 24,
+        "angle": 0,
+        "movable": false,
+        "x": 48
+      },
+      "CollisionComponent": {
+        "radius": 2,
+        "height": 2,
+        "layer": "TRIGGER"
+      },
+      "TriggerComponent": {
+        "once": false,
+        "onEnter": [
+          {
+            "event": "portal.activate"
+          }
+        ]
+      },
+      "PortalComponent": {
+        "name": "portal1",
+        "target": "portal2"
+      },
+      "TransformComponent": {}
+    }
+  }
+];
