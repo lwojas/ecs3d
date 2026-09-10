@@ -63,8 +63,8 @@ export class Raycaster {
     // Reused across frames by renderSky() so mapping a texture row to a
     // screen row isn't recomputed once per column -- see renderSky().
     this.skyRowScratch = new Int32Array(this.height);
-    this.debug = options.debug === true;
-    this.debugSpriteAnchors = options.debugSpriteAnchors === true;
+    this.debug = options.debug ?? true;
+    this.debugSpriteAnchors = options.debugSpriteAnchors ?? true;
     this.debugLogEvery = options.debugLogEvery || 0;
     this.debugFrame = 0;
     this.debugStats = this.createDebugStats();
@@ -439,6 +439,10 @@ export class Raycaster {
           : "1"
         : this.getCellId(x, y);
     return this.cells[id] || this.cells["0"];
+  }
+
+  getCellById(id) {
+    if (this.cells[id]) return this.cells[id];
   }
 
   // Runtime cell mutation for gameplay-driven geometry/collision changes

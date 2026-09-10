@@ -1,4 +1,4 @@
-import { itemData } from "./ItemSystem.js/itemData.js";
+import { itemData } from "./ItemSystem/itemData.js";
 import { System } from "./System.js";
 
 // Smallest useful interface over InventoryComponent -- add/remove/has/

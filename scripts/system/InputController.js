@@ -79,6 +79,13 @@ export class InputController {
     this.mouseLook.active = true;
   }
 
+  disableMouseLook() {
+    this.mouseLook.active = false;
+    if (document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+  }
+
   update(delta) {
     const dt = delta;
 

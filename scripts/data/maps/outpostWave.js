@@ -138,6 +138,11 @@ export default {
       "cellY": 4.5,
       "angle": 3.14159
     },
+    "hostileA": {
+      "cellX": 13.5,
+      "cellY": 3.5,
+      "angle": 3.14159
+    },
     "hostileB": {
       "cellX": 13.5,
       "cellY": 5.5,

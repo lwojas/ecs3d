@@ -25,11 +25,11 @@ export class CollisionComponent {
     this.mask = data.mask
       ? data.mask.reduce((mask, type) => mask | COLLISION[type], 0)
       : COLLISION.PLAYER;
-    console.log(
-      "CollisionComponent created with layer:",
-      this.layer,
-      "and mask:",
-      this.mask,
-    );
+    // console.log(
+    //   "CollisionComponent created with layer:",
+    //   this.layer,
+    //   "and mask:",
+    //   this.mask,
+    // );
   }
 }

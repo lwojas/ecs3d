@@ -65,7 +65,7 @@ export default class ItemRegistry {
   setSway(itemId) {
     const item = this.items[itemId];
 
-    console.log(item);
+    // console.log(item);
 
     if (!item) {
       this.sway = null;

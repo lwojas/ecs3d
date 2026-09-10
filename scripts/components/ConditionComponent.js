@@ -4,7 +4,8 @@ export class ConditionComponent {
       conditions: { type: "array" },
     },
   };
-  constructor(data = {}) {
+  constructor(entity, data = {}) {
+    this.entity = entity;
     this.conditions = Array.isArray(data.conditions) ? data.conditions : [];
   }
 }

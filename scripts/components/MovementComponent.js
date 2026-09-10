@@ -8,6 +8,7 @@ export class MovementComponent {
       viewAngle: { type: "number" },
       mouseSensitivity: { type: "number" },
       speed: { type: "number" },
+      movable: { type: "boolean" },
     },
   };
 
@@ -24,5 +25,8 @@ export class MovementComponent {
     this.speed = data.speed || 8;
     this.moveX = 0;
     this.moveY = 0;
+    this.movable = data.movable ?? true;
+    this.verticalVelocity = 0;
+    this.gravity = 100;
   }
 }

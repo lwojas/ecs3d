@@ -168,7 +168,7 @@ export const coopWaveSession = {
     // No spawnZone here -- WaveRules decides that for itself at spawn
     // time (defaults to its own "courtyard" convention, which happens to
     // match this map; see WaveRules.js).
-    waves: [{ prefab: "enemy", count: 3 }],
+    waves: [{ prefab: "enemyHunter", count: 3 }],
   },
 };
 

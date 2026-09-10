@@ -2,9 +2,11 @@
 import arenaEntities from "./arenaEntities.js";
 import outpostEntities from "./outpostEntities.js";
 import testEntities from "./testEntities.js";
+import utEnemies from "./utEnemies.js";
 
 export const entityDatasets = {
   "arenaEntities": arenaEntities,
   "outpostEntities": outpostEntities,
   "testEntities": testEntities,
+  "utEnemies": utEnemies,
 };

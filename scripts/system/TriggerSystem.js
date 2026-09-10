@@ -10,11 +10,11 @@ import { System } from "./System.js";
 // second overlap check.
 
 export class TriggerSystem extends System {
-  constructor(collisionEvents) {
+  constructor(collisionEvents, conditionalChecker) {
     super();
 
     this.collisionEvents = collisionEvents;
-
+    this.conditions = conditionalChecker;
     this.eventBus = ServiceLocator.resolve("game", "EventSystem");
 
     this.entities = this.entityManager.registerSystem(this, [
@@ -62,6 +62,20 @@ export class TriggerSystem extends System {
           // const activator = this.entityManager.getEntity(activatorId);
           // const activator = current[activatorId];
 
+          if (!activator) continue;
+
+          const condition = triggerEntity.getComponent("ConditionComponent");
+
+          if (
+            condition &&
+            !this.conditions.evaluate(condition, {
+              activator,
+              entity: triggerEntity,
+              trigger,
+            })
+          ) {
+            continue;
+          }
           if (activator) {
             this.handleEnter(trigger, triggerEntity, activator);
           }
@@ -102,6 +116,7 @@ export class TriggerSystem extends System {
     // if (trigger.once && trigger.hasFired) return;
 
     // trigger.hasFired = true;
+
     if (trigger.once) trigger.enabled = false;
 
     for (const action of trigger.onEnter) {

@@ -20,10 +20,10 @@ import { ServiceLocator } from "../../services/ServiceLocator.js";
 // resolve the whole persistent session (config + gameplay/rules) rather
 // than constructing a new one per map.
 export class GameplaySession {
-  constructor(sessionConfig) {
+  constructor(sessionConfig, { onGameOver } = {}) {
     this.config = sessionConfig;
     this.rules = createRulesForSession(sessionConfig);
-    this.gameplay = new Gameplay({ rules: this.rules });
+    this.gameplay = new Gameplay({ rules: this.rules, onGameOver });
 
     // Gameplay owns the player/user collection -- users are never
     // registered globally on their own.

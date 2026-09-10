@@ -3,7 +3,7 @@ import {
   getAvailableMaps,
   getAvailableEntityDatasets,
 } from "../api/session/sessions.js";
-import { itemData } from "../system/ItemSystem.js/itemData.js";
+import { itemData } from "../system/ItemSystem/itemData.js";
 import { resourceData } from "../system/resourceData.js";
 
 // The starting loadout new player rows get -- mirrors sessions.js's
@@ -102,6 +102,7 @@ export class GameMenu {
 
     this.modeSelect = root.querySelector('[data-field="gameMode"]');
     this.playerRows = root.querySelector("[data-player-rows]");
+    this.waveRows = root.querySelector("[data-wave-rows]");
     this.rulesDeathmatch = root.querySelector("[data-rules-deathmatch]");
     this.rulesWave = root.querySelector("[data-rules-wave]");
     this.rulesEmpty = root.querySelector("[data-rules-empty]");
@@ -116,6 +117,7 @@ export class GameMenu {
       team: "",
       ...DEFAULT_LOADOUT,
     });
+    this.addWaveRow({ count: 3 });
     this.updateRulesVisibility();
     this.updateBotModifiersVisibility();
   }
@@ -157,8 +159,10 @@ export class GameMenu {
             </label>
           </div>
           <div class="rule-field" data-rules-wave>
-            <label>Enemy wave count
-              <input type="number" min="1" step="1" data-field="waveCount" value="3" />
+            <div class="wave-rows" data-wave-rows></div>
+            <button type="button" class="btn-secondary" data-action="add-wave">+ Add Wave</button>
+            <label>Player lives
+              <input type="number" min="1" step="1" data-field="lives" value="3" />
             </label>
           </div>
           <p class="hint" data-rules-empty>No configurable rules for this mode.</p>
@@ -176,7 +180,15 @@ export class GameMenu {
     `;
   }
 
-  renderPlayerRow({ id, name, controller, team, items, equipped, resources = {} }) {
+  renderPlayerRow({
+    id,
+    name,
+    controller,
+    team,
+    items,
+    equipped,
+    resources = {},
+  }) {
     const group = document.createElement("div");
     group.className = "player-row-group";
     group.dataset.playerRow = "";
@@ -213,6 +225,41 @@ export class GameMenu {
     this.playerRows.appendChild(row);
   }
 
+  // A wave is just "how many enemies, of which prefab" -- only one
+  // prefab exists today, so there's nothing to pick yet. A prefab
+  // selector slots in here once more exist, without changing the row
+  // list's add/remove/reorder mechanics.
+  renderWaveRow({ count }) {
+    const row = document.createElement("div");
+    row.className = "wave-row";
+    row.dataset.waveRow = "";
+    row.innerHTML = `
+      <span class="wave-row-label"></span>
+      <label>Enemies
+        <input type="number" min="1" step="1" class="wave-count" value="${count}" />
+      </label>
+      <button type="button" class="btn-remove" data-action="remove-wave">Remove</button>
+    `;
+    return row;
+  }
+
+  addWaveRow(defaults) {
+    const row = this.renderWaveRow(defaults);
+    this.waveRows.appendChild(row);
+    this.renumberWaveRows();
+  }
+
+  // Display-only ("Wave 1", "Wave 2", ...) -- waves are ordered by their
+  // position in the list, so removing one always needs the labels below
+  // it to shift up.
+  renumberWaveRows() {
+    [...this.waveRows.querySelectorAll("[data-wave-row]")].forEach(
+      (row, index) => {
+        row.querySelector(".wave-row-label").textContent = `Wave ${index + 1}`;
+      },
+    );
+  }
+
   handleClick(event) {
     const action = event.target.dataset.action;
     if (!action) return;
@@ -229,6 +276,11 @@ export class GameMenu {
     } else if (action === "remove-player") {
       event.target.closest("[data-player-row]")?.remove();
       this.updateBotModifiersVisibility();
+    } else if (action === "add-wave") {
+      this.addWaveRow({ count: 3 });
+    } else if (action === "remove-wave") {
+      event.target.closest("[data-wave-row]")?.remove();
+      this.renumberWaveRows();
     } else if (action === "start") {
       this.onStart(this.buildSessionConfig());
     }
@@ -315,15 +367,21 @@ export class GameMenu {
     } else if (gameMode === "wave") {
       // Composition only (what/how many) -- *where* a wave spawns is a
       // runtime decision WaveRules makes for itself (see WaveRules.js);
-      // the menu has no business picking a map-specific zone name.
-      rules.waves = [
-        {
-          prefab: "enemy",
-          count: Number(
-            this.root.querySelector('[data-field="waveCount"]').value,
-          ),
-        },
-      ];
+      // the menu has no business picking a map-specific zone name. One
+      // row per wave, spawned in the order they're listed -- "enemyHunter"
+      // is hardcoded as the prefab since it's the only wave prefab that
+      // exists today; a per-row prefab picker replaces it once more do.
+      // Wave enemies use the hunting (not patrolling) variant so they
+      // engage from map start -- see HuntingComponent.
+      rules.waves = [...this.waveRows.querySelectorAll("[data-wave-row]")].map(
+        (row) => ({
+          prefab: "enemyHunter",
+          count: Number(row.querySelector(".wave-count").value),
+        }),
+      );
+      rules.lives = Number(
+        this.root.querySelector('[data-field="lives"]').value,
+      );
     }
     if (Object.keys(rules).length > 0) config.rules = rules;
 

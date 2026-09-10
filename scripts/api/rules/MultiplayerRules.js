@@ -48,6 +48,8 @@ export class MultiplayerRules extends GameRules {
         gameplay.score[message.killerId] =
           (gameplay.score[message.killerId] || 0) + 1;
       }
+      if (message.type === "entity.damaged") {
+      }
     }
 
     if (this.scoreLimit != null && this.hasReachedScoreLimit(gameplay)) {
