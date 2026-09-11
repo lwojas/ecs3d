@@ -45,6 +45,10 @@ export class CombatSystem extends System {
         target,
         source,
       });
+    } else {
+      // Reactions are a live-target-only concern -- a killing blow just
+      // dies, it doesn't also flinch/stagger/knock back.
+      this.applyHitReaction(target.entity, source);
     }
 
     // HUD health display is player-specific -- most damaged targets
@@ -56,6 +60,52 @@ export class CombatSystem extends System {
     }
 
     return true;
+  }
+
+  // Decides *what* reaction a hit produces and writes it onto the
+  // target's HitReactionComponent -- AISystem is the one that decides
+  // how that state actually interferes with movement/facing/attack this
+  // frame (see AISystem.tickHitReaction). Knockback and flinch/stagger
+  // are independent: a hit can carry either, both, or neither.
+  applyHitReaction(entity, source) {
+    const reaction = entity.getComponent("HitReactionComponent");
+    if (!reaction || !reaction.enabled) return;
+
+    const knockback = source.knockback ?? 0;
+    if (knockback > 0) {
+      const movement = entity.getComponent("MovementComponent");
+      const dx = movement.x - source.x;
+      const dy = movement.y - source.y;
+      const length = Math.sqrt(dx * dx + dy * dy) || 1;
+      reaction.knockbackX = (dx / length) * knockback;
+      reaction.knockbackY = (dy / length) * knockback;
+    }
+
+    const staggerPower = source.staggerPower ?? 0;
+    if (staggerPower <= 0) return; // damage-only hit -- not every hit reacts
+
+    const canStagger =
+      staggerPower >= reaction.staggerThreshold && reaction.recoveryTimer <= 0;
+
+    if (canStagger) {
+      // Refresh/extend on every qualifying hit -- lets a weapon pin a
+      // susceptible enemy -- but diminishing per consecutive stagger
+      // (reset once recoveryTimer fully elapses) stops that being an
+      // infinite stun-lock.
+      const duration = Math.max(
+        reaction.minStaggerDuration,
+        reaction.staggerDuration *
+          Math.pow(reaction.diminishingFactor, reaction.staggerChainCount),
+      );
+      reaction.staggerChainCount += 1;
+      reaction.state = "stagger";
+      reaction.timer = duration;
+    } else if (reaction.state !== "stagger") {
+      // A weak hit never downgrades an active stagger -- it just keeps
+      // dealing damage underneath it.
+      reaction.state = "flinch";
+      reaction.timer = Math.max(reaction.timer, reaction.flinchDuration);
+    }
   }
 
   heal(target, amount, options = {}) {

@@ -42,7 +42,7 @@ export const hudItems = {
       },
 
       fire: {
-        frames: [0, 2, 0, 1, 0],
+        frames: [2, 1, 0, 0, 0],
         speed: 12,
         loop: false,
       },

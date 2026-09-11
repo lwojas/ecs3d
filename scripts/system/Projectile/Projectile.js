@@ -9,6 +9,13 @@ export class Projectile {
     this.z = 0;
 
     this.damage = data.damage || 5;
+
+    // Hit-reaction inputs, read by CombatSystem.applyHitReaction --
+    // separate from damage so a weapon can hit hard without staggering,
+    // or vice versa. Default to 0 (no reaction) for anything that
+    // doesn't define them.
+    this.staggerPower = data.staggerPower ?? 0;
+    this.knockback = data.knockback ?? 0;
     this.width = data.width;
     this.height = data.height;
     this.scale = data.scale;

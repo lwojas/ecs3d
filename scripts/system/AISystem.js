@@ -31,10 +31,11 @@ const PREFER_STICKY_TARGET = true;
 //   AISystem -> attack intent -> ItemSystem -> ProjectileSystem
 //   AISystem -> animation intent -> SpriteComponent -> SpriteSystem -> Raycaster
 export class AISystem extends System {
-  constructor(raycaster, itemSystem) {
+  constructor(raycaster, itemSystem, animationSystem) {
     super();
     this.raycaster = raycaster;
     this.itemSystem = itemSystem;
+    this.animationSystem = animationSystem;
 
     this.entities = this.entityManager.registerSystem(this, [
       "AIComponent",
@@ -81,6 +82,14 @@ export class AISystem extends System {
     this.patrolList = resolveComponentList("PatrolComponent", this.entities);
     this.huntingList = resolveComponentList("HuntingComponent", this.entities);
     this.actorSelfList = resolveComponentList("ActorComponent", this.entities);
+    this.combatMovementList = resolveComponentList(
+      "CombatMovementComponent",
+      this.entities,
+    );
+    this.hitReactionList = resolveComponentList(
+      "HitReactionComponent",
+      this.entities,
+    );
   }
 
   update(delta, ecs) {
@@ -111,6 +120,8 @@ export class AISystem extends System {
       const patrol = this.patrolList[i];
       const hunting = this.huntingList[i];
       const selfActor = this.actorSelfList[i];
+      const combatMovement = this.combatMovementList[i];
+      const hitReaction = this.hitReactionList[i];
 
       ai.decisionTimer -= delta;
       if (ai.decisionTimer <= 0) {
@@ -127,11 +138,91 @@ export class AISystem extends System {
         this.decideState(ai, movement, item, patrol, ecs);
       }
 
-      this.applyMovementIntent(ai, movement, patrol);
-      this.applyFacing(ai, movement, delta);
-      this.applyAttack(ai, movement, item, ecs);
+      // Reactions are real-time, not decision-cadence -- ticked every
+      // frame regardless of decisionTimer above. This only ever
+      // interferes with how this frame's intent gets applied below; it
+      // never touches ai.state, so decideState()'s own chase/attack/
+      // patrol logic picks up exactly where it left off once a
+      // flinch/stagger clears (see the module-level design note in
+      // CombatSystem.applyHitReaction).
+      const reactionState = this.tickHitReaction(hitReaction, delta);
+      const knockbackActive = this.applyKnockback(hitReaction, movement, delta);
+
+      if (!knockbackActive) {
+        if (reactionState === "none") {
+          this.applyMovementIntent(ai, movement, patrol, combatMovement, delta);
+        } else {
+          movement.moveX = 0;
+          movement.moveY = 0;
+        }
+      }
+
+      // Flinch still lets the entity track its target; stagger is the
+      // "stronger" interruption and also halts turning.
+      if (reactionState !== "stagger") {
+        this.applyFacing(ai, movement, delta);
+      }
+
+      if (reactionState === "none") {
+        this.applyAttack(ai, movement, item, ecs);
+      }
+
       this.applySprite(ai, sprite);
     }
+  }
+
+  // Decays timer/recoveryTimer, resets staggerChainCount once fully
+  // recovered, and returns the reaction currently in effect. Knockback
+  // is ticked separately (applyKnockback) since it's an independent
+  // mechanic -- a hit can knock back without flinching/staggering.
+  tickHitReaction(hitReaction, delta) {
+    if (!hitReaction) return "none";
+
+    if (hitReaction.recoveryTimer > 0) {
+      hitReaction.recoveryTimer -= delta;
+      if (hitReaction.recoveryTimer <= 0) {
+        hitReaction.recoveryTimer = 0;
+        hitReaction.staggerChainCount = 0;
+      }
+    }
+
+    if (hitReaction.state === "none") return "none";
+
+    hitReaction.timer -= delta;
+    if (hitReaction.timer > 0) return hitReaction.state;
+
+    const expiredFrom = hitReaction.state;
+    hitReaction.state = "none";
+    hitReaction.timer = 0;
+    if (expiredFrom === "stagger") {
+      hitReaction.recoveryTimer = hitReaction.recoveryDuration;
+    }
+    return "none";
+  }
+
+  // Knockback overrides whatever movement intent this frame would
+  // otherwise apply -- physical displacement happens regardless of
+  // flinch/stagger, funneled through the same wall-safe moveX/moveY/
+  // speed contract MovementSystem already enforces for every entity.
+  // Returns whether it actually overrode movement this frame.
+  applyKnockback(hitReaction, movement, delta) {
+    if (!hitReaction) return false;
+
+    const length = Math.hypot(hitReaction.knockbackX, hitReaction.knockbackY);
+    if (length <= 0.05) {
+      hitReaction.knockbackX = 0;
+      hitReaction.knockbackY = 0;
+      return false;
+    }
+
+    movement.moveX = hitReaction.knockbackX;
+    movement.moveY = hitReaction.knockbackY;
+    movement.speed = length;
+
+    const decay = Math.max(0, 1 - hitReaction.knockbackDecay * delta);
+    hitReaction.knockbackX *= decay;
+    hitReaction.knockbackY *= decay;
+    return true;
   }
 
   // Two independent, composable gates -- kept separate on purpose:
@@ -308,7 +399,13 @@ export class AISystem extends System {
     }
 
     const target = hunting
-      ? this.findHuntTarget(ai, movement, selfActor, actorList, actorMovementList)
+      ? this.findHuntTarget(
+          ai,
+          movement,
+          selfActor,
+          actorList,
+          actorMovementList,
+        )
       : this.findVisibleTarget(
           ai,
           movement,
@@ -357,7 +454,11 @@ export class AISystem extends System {
       const dx = ai.lastKnownTargetX - movement.x;
       const dy = ai.lastKnownTargetY - movement.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      nextState = item && distance <= ai.attackRadius ? "attack" : "chase";
+      const canAttack =
+        item &&
+        distance <= ai.attackRadius &&
+        this.hasLineOfSightToTarget(ai, movement);
+      nextState = canAttack ? "attack" : "chase";
     } else {
       nextState = patrol ? "patrol" : "idle";
     }
@@ -369,7 +470,28 @@ export class AISystem extends System {
     }
   }
 
-  applyMovementIntent(ai, movement, patrol) {
+  // Additional gate on top of distance for entering "attack" -- without
+  // this, HuntingComponent's omniscient tracking (or a normal AI's
+  // awarenessMemory keeping isAware true after LOS breaks) lets an
+  // enemy fire blind through a wall it can't actually see the target
+  // through. HuntingComponent's own bypass of LOS/FOV for *finding*/
+  // chasing a target is untouched -- this only gates whether it's
+  // allowed to shoot this decision tick.
+  hasLineOfSightToTarget(ai, movement) {
+    const targetMovement = this.getTargetMovement(ai);
+    if (!targetMovement) return false;
+
+    return this.raycaster.checkVisibility(
+      { x: movement.x, y: movement.y, z: movement.z },
+      {
+        x: targetMovement.x,
+        y: targetMovement.y,
+        z: targetMovement.z + this.raycaster.cameraHeight,
+      },
+    ).visible;
+  }
+
+  applyMovementIntent(ai, movement, patrol, combatMovement, delta) {
     switch (ai.state) {
       case "chase":
         this.moveToward(
@@ -383,6 +505,8 @@ export class AISystem extends System {
         this.movePatrol(movement, patrol);
         break;
       case "attack":
+        this.applyCombatMovement(movement, combatMovement, delta);
+        break;
       case "idle":
       default:
         movement.moveX = 0;
@@ -431,6 +555,33 @@ export class AISystem extends System {
     movement.moveX = dx;
     movement.moveY = dy;
     movement.speed = patrol.speed;
+  }
+
+  // Without a CombatMovementComponent, an attacking entity just holds
+  // position (the old behaviour). With one, it strafes perpendicular to
+  // its current facing -- which applyFacing() keeps pointed at the
+  // target -- so it reads as circling/repositioning rather than
+  // drifting off at a random angle. strafeFrequency/phase are per-
+  // entity so a room full of enemies doesn't strafe in lockstep.
+  applyCombatMovement(movement, combatMovement, delta) {
+    if (!combatMovement) {
+      movement.moveX = 0;
+      movement.moveY = 0;
+      return;
+    }
+
+    combatMovement.elapsed += delta;
+
+    const strafeX = -Math.sin(movement.angle);
+    const strafeY = Math.cos(movement.angle);
+    const wobble = Math.sin(
+      combatMovement.elapsed * combatMovement.strafeFrequency * Math.PI * 2 +
+        combatMovement.phase,
+    );
+
+    movement.moveX = strafeX * wobble;
+    movement.moveY = strafeY * wobble;
+    movement.speed = combatMovement.strafeSpeed;
   }
 
   // Rotation simulated here, entirely separate from the raycaster's camera
@@ -489,12 +640,17 @@ export class AISystem extends System {
   applySprite(ai, sprite) {
     if (!sprite) return;
 
-    sprite.animationState =
-      ai.state === "attack"
-        ? "attacking"
-        : ai.state === "idle"
-          ? "idle"
-          : "walking";
+    switch (ai.state) {
+      case "attack":
+        this.animationSystem.play(ai.entity, "enemyAttack");
+        break;
+      case "idle":
+        this.animationSystem.play(ai.entity, "enemyIdle");
+        break;
+      default:
+        this.animationSystem.play(ai.entity, "enemyWalk");
+        break;
+    }
   }
 
   emitMessage(ecs, type, movement, extra = {}) {

@@ -1,0 +1,70 @@
+{
+  "width": 8,
+  "height": 8,
+  "defaultCeilingHeight": 2.5,
+  "defaultFloorHeight": 0,
+  "cellSize": 4,
+  "ambient": 0.3,
+  "sky": {
+    "texture": ""
+  },
+  "map": [
+    "11111111",
+    "10000001",
+    "11111111",
+    "10000001",
+    "10000001",
+    "11111111",
+    "10000001",
+    "11111111"
+  ],
+  "cells": {
+    "0": {
+      "name": "Empty",
+      "floorHeight": 0,
+      "ceilingHeight": 8,
+      "wall": null,
+      "floor": {
+        "texture": "doorTexture",
+        "width": 4,
+        "height": 4
+      },
+      "ceiling": {
+        "texture": "wallTexture",
+        "width": 4,
+        "height": 4
+      },
+      "fog": {
+        "distance": 16,
+        "color": {
+          "r": 16,
+          "g": 16,
+          "b": 16
+        }
+      },
+      "blocking": false
+    },
+    "1": {
+      "name": "Wall",
+      "floorHeight": 0,
+      "ceilingHeight": 8,
+      "wall": {
+        "texture": "wallXTexture",
+        "width": 4,
+        "height": 4
+      },
+      "floor": null,
+      "ceiling": null,
+      "fog": {
+        "distance": 16,
+        "color": {
+          "r": 13,
+          "g": 13,
+          "b": 13
+        }
+      }
+    }
+  },
+  "spawnPoints": {},
+  "spawnZones": {}
+}

@@ -45,11 +45,12 @@ import { PickupSystem } from "../../system/PickupSystem.js";
 import { ConditionalChecker } from "../../tools/conditionChecker.js";
 import { CellSystem } from "../../system/CellSystem.js";
 import { PortalSystem } from "../../system/PortalSystem.js";
+import { AnimationSystem } from "../../system/Animation/AnimationSystem.js";
 
 function createDefaultRaycaster(game, mapData) {
   const raycaster = new Raycaster(game, mapData, {
-    width: 320,
-    height: 180,
+    width: 320 * 2,
+    height: 180 * 2,
     debugSpriteAnchors: true,
     cellSize: 4,
     wallHeight: 8,
@@ -256,7 +257,7 @@ export class MapWorld {
     this.conditionalChecker = new ConditionalChecker(this.inventorySystem);
     this.cellSystem = new CellSystem(this.raycaster);
     this.humanPlayers = [];
-
+    this.animationSystem = new AnimationSystem();
     this.gameplayManager.players.forEach((user) => {
       // Bots have no local camera/input to bind -- without this, the
       // last bot processed here would silently steal this.cameraRenderer/
@@ -333,7 +334,11 @@ export class MapWorld {
     );
     this.itemSystem = new ItemSystem(this.hud, this.projectileSystem);
     this.interactionSystem.setItemSystem(this.itemSystem);
-    this.aiSystem = new AISystem(this.raycaster, this.itemSystem);
+    this.aiSystem = new AISystem(
+      this.raycaster,
+      this.itemSystem,
+      this.animationSystem,
+    );
     this.transformSystem = new TransformSystem();
 
     this.eventRouter.registerLightingSystem(this.lightSystem);
@@ -414,7 +419,7 @@ export class MapWorld {
     this.movementSystem.update(delta, ecs);
     this.collisionSystem.update();
     this.triggerSystem.update();
-
+    this.animationSystem.update(delta);
     this.spriteSystem.update();
     this.particleSystem.update(delta);
     this.projectileSystem.update(delta);

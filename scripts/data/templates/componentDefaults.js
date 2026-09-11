@@ -25,6 +25,7 @@ export default {
       "texture": "enemy1",
       "scale": 6
     },
+    "AnimationComponent": {},
     "MovementComponent": {
       "x": 28,
       "y": 14,
@@ -57,6 +58,14 @@ export default {
         }
       ]
     },
+    "CombatMovementComponent": {
+      "strafeSpeed": 2.5,
+      "strafeFrequency": 0.5
+    },
+    "HitReactionComponent": {
+      "staggerThreshold": 8,
+      "staggerDuration": 0.5
+    },
     "HealthComponent": {},
     "ActorComponent": {
       "team": "enemy"
@@ -69,6 +78,7 @@ export default {
       "texture": "enemy1",
       "scale": 6
     },
+    "AnimationComponent": {},
     "MovementComponent": {
       "x": 28,
       "y": 14,
@@ -89,6 +99,14 @@ export default {
         "pistol"
       ],
       "equipped": "pistol"
+    },
+    "CombatMovementComponent": {
+      "strafeSpeed": 4,
+      "strafeFrequency": 0.9
+    },
+    "HitReactionComponent": {
+      "staggerThreshold": 14,
+      "staggerDuration": 0.4
     },
     "HealthComponent": {},
     "ActorComponent": {

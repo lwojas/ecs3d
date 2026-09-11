@@ -15,6 +15,7 @@ export const editorAssets = {
   brickTexture: "/game-assets/textures/brick.png",
   skyTexture: "/game-assets/textures/sky.png",
   doorTexture: "/game-assets/textures/door.png",
+  wallXTexture: "/game-assets/textures/wall_cross_yellow.png",
   health: "/game-assets/items/health.png",
   keyRed: "/game-assets/items/key_red.png",
 };
