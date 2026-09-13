@@ -18,4 +18,5 @@ export const editorAssets = {
   wallXTexture: "/game-assets/textures/wall_cross_yellow.png",
   health: "/game-assets/items/health.png",
   keyRed: "/game-assets/items/key_red.png",
+  wallTexture3: "/game-assets/textures/m-002.png",
 };

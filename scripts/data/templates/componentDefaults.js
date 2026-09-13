@@ -1,7 +1,9 @@
 // AUTO-GENERATED from componentDefaults.json by tools/build-data.js -- do not edit by hand.
 export default {
   "player": {
-    "MovementComponent": {},
+    "MovementComponent": {
+      "movable": true
+    },
     "ItemComponent": {},
     "InventoryComponent": {},
     "HealthComponent": {},
@@ -29,7 +31,8 @@ export default {
     "MovementComponent": {
       "x": 28,
       "y": 14,
-      "z": 2
+      "z": 2,
+      "movable": true
     },
     "CollisionComponent": {
       "layer": "NPC"
@@ -82,7 +85,8 @@ export default {
     "MovementComponent": {
       "x": 28,
       "y": 14,
-      "z": 2
+      "z": 2,
+      "movable": true
     },
     "CollisionComponent": {
       "layer": "NPC"
@@ -189,6 +193,35 @@ export default {
     },
     "CellComponent": {
       "cellId": "5"
+    }
+  },
+  "light": {
+    "LightComponent": {},
+    "MovementComponent": {
+      "movable": false
+    }
+  },
+  "lightFlicker": {
+    "LightComponent": {},
+    "TweenComponent": {
+      "tweens": [
+        {
+          "id": "flicker",
+          "component": "LightComponent",
+          "property": [
+            "intensity"
+          ],
+          "from": 0.1,
+          "to": 1.5,
+          "duration": 100,
+          "loop": true,
+          "yoyo": true,
+          "active": true
+        }
+      ]
+    },
+    "MovementComponent": {
+      "movable": false
     }
   }
 };

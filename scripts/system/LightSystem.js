@@ -12,13 +12,22 @@ export class LightSystem extends System {
 
   refreshList() {
     this.lightList = resolveComponentList("LightComponent", this.entities);
+    this.movementList = resolveComponentList(
+      "MovementComponent",
+      this.entities,
+    );
   }
 
   update() {
     const len = this.lightList.length;
     for (let i = 0; i < len; i++) {
       const light = this.lightList[i];
+      const movement = this.movementList[i];
       if (light.enabled) {
+        light.x = movement.x;
+        light.y = movement.y;
+        light.z = movement.z;
+        // console.log(light.intensity);
         this.renderLightList.push(light);
       }
     }

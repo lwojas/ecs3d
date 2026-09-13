@@ -46,6 +46,7 @@ import { ConditionalChecker } from "../../tools/conditionChecker.js";
 import { CellSystem } from "../../system/CellSystem.js";
 import { PortalSystem } from "../../system/PortalSystem.js";
 import { AnimationSystem } from "../../system/Animation/AnimationSystem.js";
+import { TweenSystem } from "../../system/TweenSystem.js";
 
 function createDefaultRaycaster(game, mapData) {
   const raycaster = new Raycaster(game, mapData, {
@@ -177,7 +178,7 @@ export class MapWorld {
           ...sessionPlayer.modifiers,
           ...(isBot ? session.botModifiers : null),
         };
-
+        console.log(session);
         entity = this.spawner.spawn({
           prefab: "player",
           uniqueId: sessionPlayer.id,
@@ -341,6 +342,8 @@ export class MapWorld {
     );
     this.transformSystem = new TransformSystem();
 
+    this.tweenSystem = new TweenSystem();
+
     this.eventRouter.registerLightingSystem(this.lightSystem);
     this.eventRouter.registerHud(this.hud);
     this.eventRouter.registerInventory(this.inventorySystem);
@@ -419,6 +422,7 @@ export class MapWorld {
     this.movementSystem.update(delta, ecs);
     this.collisionSystem.update();
     this.triggerSystem.update();
+    this.tweenSystem.update(delta);
     this.animationSystem.update(delta);
     this.spriteSystem.update();
     this.particleSystem.update(delta);
@@ -427,6 +431,7 @@ export class MapWorld {
     this.transformSystem.update(delta);
 
     this.lightSystem.update();
+
     this.cameraRenderer.update(delta);
     this.hud.update(delta);
 

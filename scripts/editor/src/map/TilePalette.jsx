@@ -1,7 +1,16 @@
-import React, { useState } from "react";
+import React from "react";
 import { editorAssets } from "../data/editorAssets.js";
 
-const ALL_IDS = "0123456789".split("");
+// Cell ids stay single characters, to keep the existing string-row grid
+// format (see mapGrid.js) -- but the alphabet now runs 0-9, then a-z, then
+// A-Z (62 possible cells) instead of just 0-9. New cells are assigned the
+// next free id in this sequence automatically, so nothing in the UI ever
+// asks the user to pick one.
+const ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+export function nextFreeId(cells) {
+  return ID_ALPHABET.find((id) => !(id in cells));
+}
 
 function swatchStyle(cellDef) {
   const textureKey = cellDef?.wall?.texture || cellDef?.floor?.texture;
@@ -10,13 +19,9 @@ function swatchStyle(cellDef) {
   return { backgroundColor: cellDef?.wall ? "#565660" : "#2a2a30" };
 }
 
-// Cell ids stay single digits ("0"-"9") to keep the existing string-row
-// grid format (see mapGrid.js) -- so the palette can only offer the
-// digits not already used by another cell definition.
 export default function TilePalette({ cells, selectedTile, onSelect, onAddCell }) {
-  const [showAdd, setShowAdd] = useState(false);
   const usedIds = Object.keys(cells);
-  const freeIds = ALL_IDS.filter((id) => !usedIds.includes(id));
+  const freeId = nextFreeId(cells);
 
   return (
     <div className="tile-palette">
@@ -29,31 +34,18 @@ export default function TilePalette({ cells, selectedTile, onSelect, onAddCell }
             onClick={() => onSelect(id)}
           >
             <span className="palette-swatch" style={swatchStyle(cells[id])} />
-            <span className="palette-id">{id}</span>
             <span className="palette-name">{cells[id].name || `Cell ${id}`}</span>
           </li>
         ))}
       </ul>
 
-      {freeIds.length > 0 &&
-        (!showAdd ? (
-          <button onClick={() => setShowAdd(true)}>+ Add Cell</button>
-        ) : (
-          <div className="palette-add-options">
-            {freeIds.map((id) => (
-              <button
-                key={id}
-                onClick={() => {
-                  onAddCell(id);
-                  setShowAdd(false);
-                }}
-              >
-                {id}
-              </button>
-            ))}
-            <button onClick={() => setShowAdd(false)}>Cancel</button>
-          </div>
-        ))}
+      <button
+        disabled={!freeId}
+        onClick={() => onAddCell(freeId)}
+        title={freeId ? undefined : "All 62 cell ids are in use"}
+      >
+        + Add Cell
+      </button>
     </div>
   );
 }

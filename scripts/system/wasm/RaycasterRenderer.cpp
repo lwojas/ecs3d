@@ -33,6 +33,28 @@ std::vector<Texture> textures;
 RaycasterCameraData camera{};
 std::vector<RaycasterSpriteData> sprites;
 std::vector<RaycasterLightData> lights;
+
+// The vertical span within a cell a light can actually shine through, in
+// world-Z. `hi <= lo` means "fully blocked -- no height gets through". See
+// computeCellOpenRange()/computeLightVisibility() below for how this is
+// built; a plain solid/open boolean per cell can't represent a
+// partial-height section (a window, a step, a mezzanine's underside), since
+// that leaves an opening at *some* heights and not others.
+struct LightRange {
+  float lo;
+  float hi;
+};
+
+// One reachable-height-range-per-cell mask per active light, recomputed
+// once per frame in raycaster_render_snapshot() (see
+// computeLightVisibility()) -- indexed the same as `lights`. sampleLight()
+// consults this instead of shining every light through every wall it's
+// within radius of.
+std::vector<std::vector<LightRange>> lightVisibility;
+// Reused BFS work queue/visited-set for computeLightVisibility(), packed as
+// `y * worldWidth + x`. Cleared (not reallocated) per light.
+std::vector<int> lightBfsQueue;
+std::vector<std::uint8_t> lightBfsVisited;
 float ambient = 1.0f;
 float cellSize = 4.0f;
 float maxDistance = 1000.0f;
@@ -93,12 +115,195 @@ const RaycasterCellData* cellAt(int x, int y) {
   return &cells[id];
 }
 
-void sampleLight(float x, float y, float z, float& red, float& green,
-                 float& blue) {
+// Plain full-height walls collapse a cell's LightRange to empty; an
+// ordinary open cell (no sections) is the whole floor..ceiling span; a
+// partial-height section (a window, a step, a mezzanine's
+// underside/parapet) narrows it to whatever gap the section actually
+// leaves -- this is what the old solid-or-not boolean mask couldn't
+// represent: it treated *any* gap, anywhere in the column, as "fully open
+// at every height", so a mezzanine cell whose section only opens up
+// *below* head height still let light through at the (actually solid)
+// height of the section itself.
+constexpr LightRange kEmptyLightRange{1.0f, -1.0f};
+
+bool isLightRangeEmpty(const LightRange& range) { return range.hi <= range.lo; }
+
+LightRange intersectLightRange(const LightRange& a, const LightRange& b) {
+  return {std::max(a.lo, b.lo), std::min(a.hi, b.hi)};
+}
+
+// Conservative bounding union of two reachable ranges (same "one bounding
+// interval, not a list" simplification computeCellOpenRange() already makes
+// for disjoint gaps within a single cell) -- used by computeLightVisibility()
+// below to combine what separate neighbouring cells each propagate into a
+// shared cell, so a cell's final range reflects the least-obstructed path
+// that actually reaches it, not just whichever path happened to arrive
+// first.
+LightRange unionLightRange(const LightRange& a, const LightRange& b) {
+  if (isLightRangeEmpty(a)) return b;
+  if (isLightRangeEmpty(b)) return a;
+  return {std::min(a.lo, b.lo), std::max(a.hi, b.hi)};
+}
+
+// A cell's own local open range, ignoring anything upstream of it: its full
+// floor..ceiling span with each section's [bottom, top] band subtracted. If
+// a cell's sections leave more than one disjoint gap (e.g. a sill-and-
+// lintel window with an additional gap elsewhere), the gaps are unioned
+// into one bounding range rather than tracked as a list -- a conservative
+// simplification (very occasionally slightly too permissive between two
+// separate real gaps) that keeps this a fixed, cheap computation; the
+// overwhelmingly common case (a single window, step, or mezzanine opening)
+// has exactly one gap and this is exact for it.
+LightRange computeCellOpenRange(const RaycasterCellData* cell) {
+  if (!cell) return kEmptyLightRange;
+  if (cell->sectionCount <= 0) return {cell->floorHeight, cell->ceilingHeight};
+  const int first = std::max(0, cell->firstSection);
+  const int last =
+      std::min(static_cast<int>(sections.size()), first + cell->sectionCount);
+  // Sections are uploaded already sorted bottom-to-top (see
+  // normaliseCellDefinition() in Raycaster.js).
+  float current = cell->floorHeight;
+  float gapLo = std::numeric_limits<float>::infinity();
+  float gapHi = -std::numeric_limits<float>::infinity();
+  for (int index = first; index < last; index++) {
+    const auto& section = sections[index];
+    if (section.bottom > current + 0.001f) {
+      gapLo = std::min(gapLo, current);
+      gapHi = std::max(gapHi, section.bottom);
+    }
+    current = std::max(current, section.top);
+  }
+  if (current < cell->ceilingHeight - 0.001f) {
+    gapLo = std::min(gapLo, current);
+    gapHi = std::max(gapHi, cell->ceilingHeight);
+  }
+  if (gapHi <= gapLo) return kEmptyLightRange;
+  return {gapLo, gapHi};
+}
+
+// Bounded 4-directional grid flood fill from a light's own cell: propagates
+// the reachable world-Z range outward (narrowing it by each crossed cell's
+// own open range -- see computeCellOpenRange()), within the light's radius
+// (straight-line distance from the light to each cell's centre), stopping
+// wherever the propagated range goes empty. Run once per light per frame --
+// not per pixel -- so this costs O(cells within radius), independent of
+// screen resolution; sampleLight() below then does a single range check
+// per surface point instead of a per-pixel line-of-sight raycast.
+//
+// This is a relaxation (Bellman-Ford-style worklist), not a plain
+// visit-once BFS: a cell can be reachable from the light via more than one
+// neighbouring cell (e.g. two doorways into the same room), and each
+// candidate path can propagate a *different* range depending on what it
+// passed through (a path via a room with a low ledge is more restricted
+// than one via an open room). Committing to whichever path happens to be
+// dequeued first -- the previous behaviour -- meant an unobstructed
+// alternate path could "lock in" an unrestricted range for a cell before
+// its more-restrictive neighbour (the one actually carrying the
+// occluding ledge/section) ever got a chance to narrow it, silently
+// discarding that neighbour's occlusion. Instead, every neighbour that
+// still has an unexplored improvement gets to contribute: a cell's mask
+// is the *union* of every candidate range reached so far (see
+// unionLightRange()), and a cell is re-enqueued (not just visited once)
+// whenever a newly arriving candidate actually grows its stored range.
+// This still terminates in bounded work: each candidate is intersected
+// against the target cell's own fixed open range, so no cell's range can
+// ever grow past that cap, and each cell has only 4 neighbours, so it can
+// be usefully re-enqueued at most a handful of times before no further
+// candidate can improve it -- the same O(cells within radius) cost class
+// as before, just with a small constant factor.
+void computeLightVisibility(const RaycasterLightData& light,
+                            std::vector<LightRange>& mask) {
+  if (worldWidth <= 0 || worldHeight <= 0) {
+    mask.clear();
+    return;
+  }
+  const std::size_t cellTotal = static_cast<std::size_t>(worldWidth) *
+                                static_cast<std::size_t>(worldHeight);
+  mask.assign(cellTotal, kEmptyLightRange);
+  if (light.radius <= 0.0f || light.intensity <= 0.0f) return;
+
+  const int startX = static_cast<int>(std::floor(light.x / cellSize));
+  const int startY = static_cast<int>(std::floor(light.y / cellSize));
+  if (startX < 0 || startY < 0 || startX >= worldWidth || startY >= worldHeight)
+    return;
+
+  // Now means "currently queued for (re)processing", not "ever visited" --
+  // a cell can be dequeued, processed, and later re-queued if one of its
+  // neighbours subsequently improves its range.
+  lightBfsVisited.assign(cellTotal, 0);
+  const float radiusSquared = light.radius * light.radius;
+  lightBfsQueue.clear();
+  const std::size_t startIndex =
+      static_cast<std::size_t>(startY) * worldWidth + startX;
+  // Seed with the light's own room's local range -- but if the light
+  // happens to sit inside geometry this coarse model calls "fully solid"
+  // (e.g. embedded in a wall), still light its immediate surroundings
+  // rather than going instantly dark, matching the old mask's leniency for
+  // this edge case.
+  const LightRange startRange = computeCellOpenRange(cellAt(startX, startY));
+  mask[startIndex] =
+      isLightRangeEmpty(startRange) ? LightRange{-1e6f, 1e6f} : startRange;
+  lightBfsVisited[startIndex] = 1;
+  lightBfsQueue.push_back(startY * worldWidth + startX);
+
+  static const int kNeighborDX[4] = {1, -1, 0, 0};
+  static const int kNeighborDY[4] = {0, 0, 1, -1};
+
+  for (std::size_t head = 0; head < lightBfsQueue.size(); head++) {
+    const int packed = lightBfsQueue[head];
+    const int x = packed % worldWidth;
+    const int y = packed / worldWidth;
+    const std::size_t index = static_cast<std::size_t>(y) * worldWidth + x;
+    // Dequeued: eligible to be re-enqueued later if a neighbour still
+    // manages to improve it further.
+    lightBfsVisited[index] = 0;
+    const LightRange current = mask[index];
+    for (int neighbor = 0; neighbor < 4; neighbor++) {
+      const int nx = x + kNeighborDX[neighbor];
+      const int ny = y + kNeighborDY[neighbor];
+      if (nx < 0 || ny < 0 || nx >= worldWidth || ny >= worldHeight) continue;
+      const std::size_t nIndex = static_cast<std::size_t>(ny) * worldWidth + nx;
+      const float centerX = (nx + 0.5f) * cellSize;
+      const float centerY = (ny + 0.5f) * cellSize;
+      const float dx = centerX - light.x;
+      const float dy = centerY - light.y;
+      if (dx * dx + dy * dy >= radiusSquared) continue;
+      const LightRange candidate =
+          intersectLightRange(current, computeCellOpenRange(cellAt(nx, ny)));
+      if (isLightRangeEmpty(candidate)) continue;
+      const LightRange merged = unionLightRange(mask[nIndex], candidate);
+      // Nothing new reached this cell via this edge -- don't re-enqueue it
+      // (this is what bounds the total amount of relaxation work).
+      if (merged.lo == mask[nIndex].lo && merged.hi == mask[nIndex].hi) continue;
+      mask[nIndex] = merged;
+      if (!lightBfsVisited[nIndex]) {
+        lightBfsVisited[nIndex] = 1;
+        lightBfsQueue.push_back(ny * worldWidth + nx);
+      }
+    }
+  }
+}
+
+// `mapX`/`mapY` is the grid cell the sampled surface point belongs to (for a
+// wall face, the room it faces into -- see previousCellForSegment() below,
+// not the solid cell itself). A light only contributes if `z` falls inside
+// that cell's precomputed reachable range for this light; the actual
+// attenuation math is unchanged.
+void sampleLight(float x, float y, float z, int mapX, int mapY, float& red,
+                 float& green, float& blue) {
   red = ambient;
   green = ambient;
   blue = ambient;
-  for (const auto& light : lights) {
+  if (mapX < 0 || mapY < 0 || mapX >= worldWidth || mapY >= worldHeight)
+    return;
+  const std::size_t index = static_cast<std::size_t>(mapY) * worldWidth + mapX;
+  for (std::size_t lightIndex = 0; lightIndex < lights.size(); lightIndex++) {
+    if (lightIndex >= lightVisibility.size()) continue;
+    const auto& mask = lightVisibility[lightIndex];
+    if (index >= mask.size()) continue;
+    const auto& range = mask[index];
+    if (z < range.lo || z > range.hi) continue;
+    const auto& light = lights[lightIndex];
     const float dx = x - light.x;
     const float dy = y - light.y;
     const float dz = z - light.z;
@@ -109,6 +314,29 @@ void sampleLight(float x, float y, float z, float& red, float& green,
       green += strength * light.tintG;
       blue += strength * light.tintB;
     }
+  }
+}
+
+// The "room" a wall face's near surface belongs to, for lighting purposes:
+// the cell the ray was traversing immediately before it crossed into
+// `segment`'s (solid) cell -- derived from which axis boundary was crossed
+// (`entrySide`) and the ray's direction, with no extra DDA work. A segment
+// with no entry side (the cell the camera starts inside of) has no "before"
+// cell, so it stands in for itself.
+void previousCellForSegment(const Segment& segment, int& fromX, int& fromY) {
+  if (segment.entrySide < 0) {
+    fromX = segment.mapX;
+    fromY = segment.mapY;
+    return;
+  }
+  const int stepX = segment.dirX < 0.0f ? -1 : 1;
+  const int stepY = segment.dirY < 0.0f ? -1 : 1;
+  if (segment.entrySide == 0) {
+    fromX = segment.mapX - stepX;
+    fromY = segment.mapY;
+  } else {
+    fromX = segment.mapX;
+    fromY = segment.mapY - stepY;
   }
 }
 
@@ -290,7 +518,7 @@ int subtractInterval(float* intervals, int count, float top, float bottom) {
 int renderPlane(const RaycasterCameraData* value, int screenX,
                 const Segment& segment, int materialId, float planeHeight,
                 float rayCos, float* visible, int visibleCount, float horizon,
-                float focalLength) {
+                float focalLength, int lightMapX, int lightMapY) {
   if (visibleCount <= 0) return visibleCount;
   if (materialId < 0 || materialId >= static_cast<int>(materials.size()))
     return visibleCount;
@@ -339,7 +567,8 @@ int renderPlane(const RaycasterCameraData* value, int screenX,
     float lightR;
     float lightG;
     float lightB;
-    sampleLight(worldX, worldY, planeHeight, lightR, lightG, lightB);
+    sampleLight(worldX, worldY, planeHeight, lightMapX, lightMapY, lightR,
+               lightG, lightB);
     const float fog = cell->fogEnabled && cell->fogDistance > 0.0f
                           ? std::min(1.0f, distance / cell->fogDistance)
                           : 0.0f;
@@ -369,7 +598,7 @@ int renderPlane(const RaycasterCameraData* value, int screenX,
 void drawWallSection(int screenX, const Segment& segment,
                      const RaycasterSectionData& section, float top,
                      float bottom, const float* visible, int visibleCount,
-                     float projectedDistance) {
+                     float projectedDistance, int lightMapX, int lightMapY) {
   if (section.material < 0 ||
       section.material >= static_cast<int>(materials.size()))
     return;
@@ -416,8 +645,8 @@ void drawWallSection(int screenX, const Segment& segment,
     float lightR;
     float lightG;
     float lightB;
-    sampleLight(segment.entryHitX, segment.entryHitY, worldZ, lightR, lightG,
-               lightB);
+    sampleLight(segment.entryHitX, segment.entryHitY, worldZ, lightMapX,
+               lightMapY, lightR, lightG, lightB);
     const std::size_t depthIndex =
         static_cast<std::size_t>(y) * framebufferWidth + screenX;
     const std::size_t destination = depthIndex * 4;
@@ -445,7 +674,8 @@ void drawWallSection(int screenX, const Segment& segment,
 int drawSectionCaps(const RaycasterCameraData* value, int screenX,
                     const Segment& segment, int first, int sectionCount,
                     int index, float rayCos, float* visible, int visibleCount,
-                    float horizon, float focalLength) {
+                    float horizon, float focalLength, int lightMapX,
+                    int lightMapY) {
   const auto& section = sections[first + index];
   const RaycasterCellData* cell = segment.cell;
   const float ceilingBound = index + 1 < sectionCount
@@ -454,7 +684,7 @@ int drawSectionCaps(const RaycasterCameraData* value, int screenX,
   if (section.top < ceilingBound) {
     visibleCount = renderPlane(value, screenX, segment, section.material,
                                section.top, rayCos, visible, visibleCount,
-                               horizon, focalLength);
+                               horizon, focalLength, lightMapX, lightMapY);
     if (!visibleCount) return visibleCount;
   }
   const float floorBound =
@@ -462,7 +692,7 @@ int drawSectionCaps(const RaycasterCameraData* value, int screenX,
   if (section.bottom > floorBound) {
     visibleCount = renderPlane(value, screenX, segment, section.material,
                                section.bottom, rayCos, visible, visibleCount,
-                               horizon, focalLength);
+                               horizon, focalLength, lightMapX, lightMapY);
   }
   return visibleCount;
 }
@@ -501,9 +731,11 @@ struct SpriteBlend {
   float fogB;
 };
 
-SpriteBlend resolveSpriteLight(float worldX, float worldY, float worldZ) {
+SpriteBlend resolveSpriteLight(float worldX, float worldY, float worldZ,
+                               int mapX, int mapY) {
   SpriteBlend blend{};
-  sampleLight(worldX, worldY, worldZ, blend.lightR, blend.lightG, blend.lightB);
+  sampleLight(worldX, worldY, worldZ, mapX, mapY, blend.lightR, blend.lightG,
+             blend.lightB);
   return blend;
 }
 
@@ -572,13 +804,14 @@ void renderBillboardSprite(const RaycasterCameraData* value,
                             static_cast<int>(std::floor(bottom)));
   if (startX > endX || startY > endY) return;
 
-  const RaycasterCellData* cell =
-      cellAt(static_cast<int>(std::floor(sprite.x / cellSize)),
-            static_cast<int>(std::floor(sprite.y / cellSize)));
+  const int cellX = static_cast<int>(std::floor(sprite.x / cellSize));
+  const int cellY = static_cast<int>(std::floor(sprite.y / cellSize));
+  const RaycasterCellData* cell = cellAt(cellX, cellY);
   // Lighting and fog are resolved once for the whole sprite (a flat
   // billboard has no per-pixel world depth of its own), not per pixel --
   // same as SoftwareRenderer.js's renderBillboard().
-  SpriteBlend blend = resolveSpriteLight(sprite.x, sprite.y, sprite.z);
+  SpriteBlend blend = resolveSpriteLight(sprite.x, sprite.y, sprite.z, cellX,
+                                        cellY);
   resolveSpriteFog(blend, cell, depth);
   const float widthScale = texture.width / std::max(1.0f, rightF - leftF + 1.0f);
   const float heightScale =
@@ -651,14 +884,15 @@ void renderOrientedSprite(const RaycasterCameraData* value,
       static_cast<int>(std::floor(std::max(leftScreenX, rightScreenX))));
   if (startX > endX) return;
 
-  const RaycasterCellData* cell =
-      cellAt(static_cast<int>(std::floor(sprite.x / cellSize)),
-            static_cast<int>(std::floor(sprite.y / cellSize)));
+  const int cellX = static_cast<int>(std::floor(sprite.x / cellSize));
+  const int cellY = static_cast<int>(std::floor(sprite.y / cellSize));
+  const RaycasterCellData* cell = cellAt(cellX, cellY);
   // Light depends only on the sprite's own position/height, not on which
   // column is being drawn, so (like the billboard path) it is resolved
   // once for the whole sprite; fog varies with each column's perspective-
   // correct depth, so it's re-resolved inside the loop below.
-  SpriteBlend blend = resolveSpriteLight(sprite.x, sprite.y, sprite.z);
+  SpriteBlend blend = resolveSpriteLight(sprite.x, sprite.y, sprite.z, cellX,
+                                        cellY);
   const float invLeftDepth = 1.0f / leftDepth;
   const float invRightDepth = 1.0f / rightDepth;
 
@@ -930,6 +1164,14 @@ void raycaster_render_snapshot(const RaycasterCameraData* value) {
   }
   raycaster_reset_depth();
 
+  // Per-light reachable-cell masks, recomputed once per frame (not per
+  // pixel/column) -- see computeLightVisibility(). Cheap: bounded by
+  // cells-within-radius per light, independent of framebuffer resolution.
+  lightVisibility.resize(lights.size());
+  for (std::size_t lightIndex = 0; lightIndex < lights.size(); lightIndex++) {
+    computeLightVisibility(lights[lightIndex], lightVisibility[lightIndex]);
+  }
+
   float visible[kVisibleIntervalCapacity * 2];
 
   for (int screenX = 0; screenX < framebufferWidth; screenX++) {
@@ -957,6 +1199,9 @@ void raycaster_render_snapshot(const RaycasterCameraData* value) {
         const int last =
             std::min(static_cast<int>(sections.size()), first + cell->sectionCount);
         const int sectionCount = last - first;
+        int fromX;
+        int fromY;
+        previousCellForSegment(segment, fromX, fromY);
         for (int sectionIndex = first; sectionIndex < last && visibleCount;
              sectionIndex++) {
           const auto& sectionData = sections[sectionIndex];
@@ -967,22 +1212,24 @@ void raycaster_render_snapshot(const RaycasterCameraData* value) {
               projectWorldZ(sectionData.bottom, distance, horizon, value->z,
                            focalLength);
           drawWallSection(screenX, segment, sectionData, top, bottom, visible,
-                          visibleCount, distance);
+                          visibleCount, distance, fromX, fromY);
           visibleCount = subtractInterval(visible, visibleCount, top, bottom);
           if (!visibleCount) break;
           visibleCount = drawSectionCaps(
               value, screenX, segment, first, sectionCount,
               sectionIndex - first, rayCos, visible, visibleCount, horizon,
-              focalLength);
+              focalLength, fromX, fromY);
         }
       }
 
       visibleCount = renderPlane(value, screenX, segment, cell->floorMaterial,
                                  cell->floorHeight, rayCos, visible,
-                                 visibleCount, horizon, focalLength);
+                                 visibleCount, horizon, focalLength,
+                                 segment.mapX, segment.mapY);
       visibleCount = renderPlane(value, screenX, segment, cell->ceilingMaterial,
                                  cell->ceilingHeight, rayCos, visible,
-                                 visibleCount, horizon, focalLength);
+                                 visibleCount, horizon, focalLength,
+                                 segment.mapX, segment.mapY);
     }
   }
 
@@ -1056,6 +1303,9 @@ void raycaster_destroy() {
   textures.clear();
   sprites.clear();
   lights.clear();
+  lightVisibility.clear();
+  lightBfsQueue.clear();
+  lightBfsVisited.clear();
   segmentScratch.clear();
   spriteDepthOrder.clear();
   skyRowScratch.clear();

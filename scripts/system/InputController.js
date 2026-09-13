@@ -62,9 +62,9 @@ export class InputController {
       this.inputBindings.pointer.movementY += event.movementY;
       this.target.angle += event.movementX * this.mouseLook.sensitivity;
       this.target.viewAngle -=
-        event.movementY * this.mouseLook.sensitivity * 100;
+        event.movementY * this.mouseLook.sensitivity * 200;
 
-      this.target.viewAngle = Phaser.Math.clamp(this.target.viewAngle, -80, 80);
+      // this.target.viewAngle = Phaser.Math.clamp(this.target.viewAngle, -60, 60);
     };
     document.addEventListener("mousemove", this.mouseMoveHandler);
   }

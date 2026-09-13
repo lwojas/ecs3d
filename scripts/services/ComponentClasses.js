@@ -22,6 +22,7 @@ import { SpriteComponent } from "../components/SpriteComponent.js";
 
 import { TransformComponent } from "../components/TransformComponent.js";
 import { TriggerComponent } from "../components/TriggerComponent.js";
+import { TweenComponent } from "../components/TweenComponent.js";
 
 export const componentClasses = {
   MovementComponent: MovementComponent,
@@ -47,4 +48,5 @@ export const componentClasses = {
   AnimationComponent: AnimationComponent,
   CombatMovementComponent: CombatMovementComponent,
   HitReactionComponent: HitReactionComponent,
+  TweenComponent: TweenComponent,
 };

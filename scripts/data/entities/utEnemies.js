@@ -62,5 +62,24 @@ export default [
       },
       "TransformComponent": {}
     }
+  },
+  {
+    "type": "light",
+    "uniqueId": "light_1",
+    "components": {
+      "LightComponent": {
+        "enabled": true
+      },
+      "MovementComponent": {
+        "x": 80,
+        "y": 8,
+        "z": 28
+      },
+      "CollisionComponent": {
+        "radius": 2,
+        "height": 2,
+        "enabled": true
+      }
+    }
   }
 ];

@@ -1,7 +1,8 @@
-// Pure helpers over the map's grid representation -- an array of digit
-// strings, one per row (unchanged from the game's own format; see
-// scripts/data/maps/testMap.json). Kept separate from any component so
-// GridEditor/MapProperties stay simple wiring around these.
+// Pure helpers over the map's grid representation -- an array of strings,
+// one per row, each character a single-character cell id (unchanged from
+// the game's own format; see scripts/data/maps/testMap.json). Kept
+// separate from any component so GridEditor/MapProperties stay simple
+// wiring around these.
 
 export function setTile(mapRows, x, y, tileId) {
   const row = mapRows[y];

@@ -60,7 +60,12 @@ export default function App() {
           <MapView doc={mapDoc} />
         </div>
         <div style={{ display: activeTab === "entities" ? "contents" : "none" }}>
-          <EntityView doc={entitiesDoc} spawnPointNames={spawnPointNames} templatesDoc={templatesDoc} />
+          <EntityView
+            doc={entitiesDoc}
+            spawnPointNames={spawnPointNames}
+            templatesDoc={templatesDoc}
+            mapData={mapDoc.data}
+          />
         </div>
         <div style={{ display: activeTab === "templates" ? "contents" : "none" }}>
           <TemplatesView doc={templatesDoc} />

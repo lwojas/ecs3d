@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import EntityList from "./EntityList.jsx";
 import EntityInspector from "./EntityInspector.jsx";
+import EntityPositionPreview from "./EntityPositionPreview.jsx";
 
-export default function EntityView({ doc, spawnPointNames, templatesDoc }) {
+export default function EntityView({ doc, spawnPointNames, templatesDoc, mapData }) {
   const [selectedId, setSelectedId] = useState(null);
 
   if (!doc.data) {
@@ -40,21 +41,28 @@ export default function EntityView({ doc, spawnPointNames, templatesDoc }) {
         />
       </aside>
 
-      <section className="panel detail-panel">
+      <section className="detail-panel">
         {selected ? (
-          <EntityInspector
-            key={selected.uniqueId}
-            entity={selected}
-            spawnPointNames={spawnPointNames}
-            templatesDoc={templatesDoc}
-            onChange={updateSelected}
-            onRename={(newId) => {
-              updateEntities((prev) => prev.map((e, i) => (i === selectedIndex ? { ...e, uniqueId: newId } : e)));
-              setSelectedId(newId);
-            }}
-          />
+          <>
+            <div className="panel">
+              <EntityPositionPreview map={mapData} entity={selected} />
+            </div>
+            <div className="panel">
+              <EntityInspector
+                key={selected.uniqueId}
+                entity={selected}
+                spawnPointNames={spawnPointNames}
+                templatesDoc={templatesDoc}
+                onChange={updateSelected}
+                onRename={(newId) => {
+                  updateEntities((prev) => prev.map((e, i) => (i === selectedIndex ? { ...e, uniqueId: newId } : e)));
+                  setSelectedId(newId);
+                }}
+              />
+            </div>
+          </>
         ) : (
-          <div className="empty-state">Select an entity to edit.</div>
+          <div className="panel empty-state">Select an entity to edit.</div>
         )}
       </section>
     </div>

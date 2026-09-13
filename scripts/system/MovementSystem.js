@@ -64,7 +64,8 @@ export class MovementSystem extends System {
           target.y = nextY;
         }
       }
-
+      // console.log(target, target.movable);
+      // if (!target.movable) continue;
       this.updateVerticalPosition(target, dt);
     }
   }

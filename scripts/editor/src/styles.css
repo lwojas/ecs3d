@@ -139,6 +139,12 @@ body {
   padding: 20px;
 }
 
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 h3 {
   margin: 0 0 10px;
   font-size: 13px;
@@ -321,12 +327,6 @@ fieldset.surface-field legend {
   flex: 0 0 auto;
 }
 
-.palette-id {
-  font-family: var(--mono);
-  color: var(--text-dim);
-  width: 14px;
-}
-
 .palette-name {
   flex: 1;
   overflow: hidden;
@@ -406,6 +406,34 @@ fieldset.surface-field legend {
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 12px;
+}
+
+/* Entity position preview */
+
+.entity-map-preview-box {
+  position: relative;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+
+.entity-map-preview-marker {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+}
+
+.entity-map-preview-facing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 2px;
+  background: #fff;
+  transform-origin: left center;
 }
 
 /* Entity list */

@@ -35,6 +35,7 @@ BasicGame.Boot.prototype = {
     this.load.image("Plasma", "assets/projectiles/plasma.png");
     this.load.image("doorTexture", "assets/textures/door.png");
     this.load.image("wallXTexture", "assets/textures/wall_cross_yellow.png");
+    this.load.image("wallTexture3", "assets/textures/m-002.png");
     this.load.image("health", "assets/items/health.png");
     this.load.image("keyRed", "assets/items/key_red.png");
     this.load.image("bloodDrop", "assets/particles/blood.png");
