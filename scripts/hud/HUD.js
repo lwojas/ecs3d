@@ -4,6 +4,7 @@ import ItemRegistry from "./ItemRegistry.js";
 import PersistentHUD from "./PersistentHUD.js";
 
 // HUD.js
+// Fixed file casing
 
 export default class HUD {
   constructor(game, options = {}) {
