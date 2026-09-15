@@ -7,8 +7,10 @@ RUN npm ci --prefix scripts/editor
 
 COPY assets ./assets
 COPY scripts/services ./scripts/services
-COPY scripts/components ./scripts/components    
+COPY scripts/tools ./scripts/tools
+COPY scripts/components ./scripts/components
 COPY scripts/editor ./scripts/editor
+
 
 ARG VITE_CONTENT_SERVER_URL=http://lynn2:4000
 ARG VITE_CONTENT_PROJECT=raycaster
