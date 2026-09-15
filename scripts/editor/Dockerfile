@@ -6,6 +6,8 @@ COPY scripts/editor/package*.json ./scripts/editor/
 RUN npm ci --prefix scripts/editor
 
 COPY assets ./assets
+COPY services ./services
+COPY scripts/components ./scripts/components
 COPY scripts/editor ./scripts/editor
 
 ARG VITE_CONTENT_SERVER_URL=http://lynn2:4000
