@@ -47,23 +47,26 @@ function makeSessionConfig() {
   };
 }
 
-function buildWorld(gameplaySession) {
+async function buildWorld(gameplaySession) {
   const world = new MapWorld(gameplaySession, {
     game: {},
     createRaycaster: fakeCreateRaycaster,
   });
-  world.buildWorld();
+  await world.buildWorld();
   return world;
 }
 
-function testPersistentGameplayAndUserSurviveAMapTransition() {
+async function testPersistentGameplayAndUserSurviveAMapTransition() {
   // 1. Create one persistent gameplay session with a User.
   const gameplaySession = new GameplaySession(makeSessionConfig());
   const persistentUser = gameplaySession.gameplay.getPlayer("player-1");
-  assert.ok(persistentUser, "GameplaySession should own a persistent User for player-1");
+  assert.ok(
+    persistentUser,
+    "GameplaySession should own a persistent User for player-1",
+  );
 
   // 2. Load/build Map A.
-  const mapA = buildWorld(gameplaySession);
+  const mapA = await buildWorld(gameplaySession);
   const entityA = mapA.playerEntities.get("player-1");
   assert.ok(entityA, "Map A should hydrate an ECS entity for player-1");
   assert.equal(entityA.getComponent("InventoryComponent").equipped, "pistol");
@@ -99,10 +102,14 @@ function testPersistentGameplayAndUserSurviveAMapTransition() {
   // transition would also point gameplaySession.config.map/entities at
   // the next map first; same map data is reused here since only the
   // Gameplay/User lifecycle is under test, not map data resolution.
-  const mapB = buildWorld(gameplaySession);
+  const mapB = await buildWorld(gameplaySession);
   const entityB = mapB.playerEntities.get("player-1");
   assert.ok(entityB, "Map B should hydrate a *new* ECS entity for player-1");
-  assert.notEqual(entityB, entityA, "Map B must spawn a fresh entity, not reuse Map A's");
+  assert.notEqual(
+    entityB,
+    entityA,
+    "Map B must spawn a fresh entity, not reuse Map A's",
+  );
 
   // 7. The persistent User -- not Map A's destroyed world -- is what
   // hydrates Map B's entity, so the pickup carries across the
@@ -129,7 +136,7 @@ const tests = [
 ];
 
 for (const [name, test] of tests) {
-  test();
+  await test();
   console.log(`PASS ${name}`);
 }
 

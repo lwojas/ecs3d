@@ -1,0 +1,17 @@
+services:
+  runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8084:80"
+
+  editor:
+    build:
+      context: .
+      dockerfile: scripts/editor/Dockerfile
+      args:
+        VITE_CONTENT_SERVER_URL: ${VITE_CONTENT_SERVER_URL:-http://lynn2:4000}
+        VITE_CONTENT_PROJECT: ${VITE_CONTENT_PROJECT:-raycaster}
+    ports:
+      - "5183:80"

@@ -1,5 +1,40 @@
-import { maps } from "../../data/maps/index.js";
-import { entityDatasets } from "../../data/entities/index.js";
+const DEFAULT_CONTENT_SERVER_BASE_URL = "http://lynn2:4000/api";
+const PROJECT_NAME = "raycaster";
+const contentCache = new Map();
+
+export function getContentServerBaseUrl() {
+  return (
+    globalThis.CONTENT_SERVER_BASE_URL ?? DEFAULT_CONTENT_SERVER_BASE_URL
+  ).replace(/\/$/, "");
+}
+
+async function fetchJson(path) {
+  const response = await fetch(`${getContentServerBaseUrl()}${path}`);
+  if (!response.ok) {
+    throw new Error(
+      `Content server request failed (${response.status}): ${path}`,
+    );
+  }
+  return response.json();
+}
+
+function cached(key, loader) {
+  if (!contentCache.has(key)) contentCache.set(key, loader());
+  return contentCache.get(key);
+}
+
+function listDocuments(type) {
+  return cached(`list:${type}`, async () => {
+    const result = await fetchJson(`/projects/${PROJECT_NAME}/${type}`);
+    return result.documents;
+  });
+}
+
+function loadDocument(type, name) {
+  return cached(`document:${type}:${name}`, () =>
+    fetchJson(`/projects/${PROJECT_NAME}/${type}/${encodeURIComponent(name)}`),
+  );
+}
 
 // The contract a future main-menu configurator will eventually produce.
 // `map`/`entities` are string keys (not live object references) so this
@@ -40,43 +75,27 @@ import { entityDatasets } from "../../data/entities/index.js";
 //                    not cumulative): modifiers -> player.modifiers ->
 //                    botModifiers. See GameSession.buildWorld().
 //
-// `maps`/`entityDatasets` are generated registries, not hand-maintained
-// here -- one entry per JSON file the editor writes to scripts/data/maps
-// and scripts/data/entities. Run `npm run data:build` (or `npm start`,
-// which runs it automatically) after adding/editing one; see
-// tools/build-data.js.
-
 // Accepts either a registered string key or already-resolved data
 // passed straight through (used by tests to exercise GameSession without
-// registering one-off fixtures in the tables above; every real session
-// still just passes a string key).
+// registering one-off fixtures; real sessions use content-server keys).
 export function resolveMapData(nameOrData) {
   if (typeof nameOrData !== "string") return nameOrData;
-  const map = maps[nameOrData];
-  if (!map) {
-    throw new Error(`Unknown map: "${nameOrData}"`);
-  }
-  return map;
+  return loadDocument("maps", nameOrData);
 }
 
 export function resolveEntityData(nameOrData) {
   if (typeof nameOrData !== "string") return nameOrData;
-  const entities = entityDatasets[nameOrData];
-  if (!entities) {
-    throw new Error(`Unknown entity dataset: "${nameOrData}"`);
-  }
-  return entities;
+  return loadDocument("entities", nameOrData);
 }
 
 // The registered keys, for anything that needs to *list* what's
-// available (e.g. the HTML menu's map/entities selects) without loading
-// or duplicating the underlying data.
+// available (e.g. the HTML menu's map/entities selects).
 export function getAvailableMaps() {
-  return Object.keys(maps);
+  return listDocuments("maps");
 }
 
 export function getAvailableEntityDatasets() {
-  return Object.keys(entityDatasets);
+  return listDocuments("entities");
 }
 
 // A bot is a player controlled by AI -- not a separate population.

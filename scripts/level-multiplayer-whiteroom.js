@@ -23,7 +23,9 @@ export class MultiplayerWhiteroom {
     }
 
     this.world = new MapWorld(gameplaySession, { game: this.game });
-    this.world.start();
+    this.world.start().catch((error) => {
+      console.error("Unable to load game world", error);
+    });
   }
 
   update() {

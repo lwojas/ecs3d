@@ -107,6 +107,9 @@ export class GameMenu {
     this.rulesWave = root.querySelector("[data-rules-wave]");
     this.rulesEmpty = root.querySelector("[data-rules-empty]");
     this.botModifiersPanel = root.querySelector("[data-bot-modifiers-panel]");
+    this.mapSelect = root.querySelector('[data-field="map"]');
+    this.entitySelect = root.querySelector('[data-field="entities"]');
+    this.startButton = root.querySelector('[data-action="start"]');
 
     root.addEventListener("click", (event) => this.handleClick(event));
     root.addEventListener("change", (event) => this.handleChange(event));
@@ -120,6 +123,24 @@ export class GameMenu {
     this.addWaveRow({ count: 3 });
     this.updateRulesVisibility();
     this.updateBotModifiersVisibility();
+    this.ready = this.loadContentOptions();
+  }
+
+  async loadContentOptions() {
+    try {
+      const [maps, entityDatasets] = await Promise.all([
+        getAvailableMaps(),
+        getAvailableEntityDatasets(),
+      ]);
+      this.mapSelect.innerHTML = optionsHtml(maps);
+      this.entitySelect.innerHTML = optionsHtml(entityDatasets, {
+        withNone: true,
+        noneLabel: "None (dynamic spawn only)",
+      });
+      this.startButton.disabled = false;
+    } catch (error) {
+      console.error("Unable to load game content", error);
+    }
   }
 
   renderShell() {
@@ -134,13 +155,10 @@ export class GameMenu {
               <select data-field="gameMode">${gameModeOptionsHtml(GAME_MODES)}</select>
             </label>
             <label>Map
-              <select data-field="map">${optionsHtml(getAvailableMaps())}</select>
+              <select data-field="map"></select>
             </label>
             <label>Entity dataset
-              <select data-field="entities">${optionsHtml(
-                getAvailableEntityDatasets(),
-                { withNone: true, noneLabel: "None (dynamic spawn only)" },
-              )}</select>
+              <select data-field="entities"></select>
             </label>
           </div>
         </section>
@@ -175,7 +193,7 @@ export class GameMenu {
           </label>
         </section>
 
-        <button type="button" class="btn-primary" data-action="start">Start Game</button>
+        <button type="button" class="btn-primary" data-action="start" disabled>Start Game</button>
       </div>
     `;
   }
@@ -260,7 +278,7 @@ export class GameMenu {
     );
   }
 
-  handleClick(event) {
+  async handleClick(event) {
     const action = event.target.dataset.action;
     if (!action) return;
 
@@ -282,6 +300,7 @@ export class GameMenu {
       event.target.closest("[data-wave-row]")?.remove();
       this.renumberWaveRows();
     } else if (action === "start") {
+      await this.ready;
       this.onStart(this.buildSessionConfig());
     }
   }

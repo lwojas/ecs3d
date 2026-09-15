@@ -97,11 +97,11 @@ export class MapWorld {
     this.createRaycaster = createRaycaster;
   }
 
-  buildWorld() {
+  async buildWorld() {
     const session = this.config;
-    const mapData = resolveMapData(session.map);
+    const mapData = await resolveMapData(session.map);
     const entityData = session.entities
-      ? resolveEntityData(session.entities)
+      ? await resolveEntityData(session.entities)
       : [];
 
     this.eventSystemGame = new EventBus("game");
@@ -408,12 +408,15 @@ export class MapWorld {
     bindTestDoor(this.raycaster);
   }
 
-  start() {
-    this.buildWorld();
+  async start() {
+    this.ready = false;
+    await this.buildWorld();
     this.attachView();
+    this.ready = true;
   }
 
   update() {
+    if (!this.ready) return;
     const delta = this.game.time.elapsed / 1000;
     const ecs = this.ecs;
 

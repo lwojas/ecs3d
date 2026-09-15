@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { GameplaySession } from "../scripts/api/session/GameplaySession.js";
 import { MapWorld } from "../scripts/api/session/MapWorld.js";
+import testMap from "../scripts/data/maps/testMap.js";
+import testEntities from "../scripts/data/entities/testEntities.js";
 import {
   singlePlayerSession,
   coopSession,
@@ -25,18 +27,26 @@ function fakeCreateRaycaster() {
 // current MapWorld together, since these tests only care about a single
 // map's world -- see session-lifecycle.test.mjs for a test that spans
 // two MapWorld instances off one GameplaySession.
-function buildSession(sessionConfig) {
-  const gameplaySession = new GameplaySession(sessionConfig);
+async function buildSession(sessionConfig) {
+  const fixtureConfig = {
+    ...sessionConfig,
+    map: sessionConfig.map === "testMap" ? testMap : sessionConfig.map,
+    entities:
+      sessionConfig.entities === "testEntities"
+        ? testEntities
+        : sessionConfig.entities,
+  };
+  const gameplaySession = new GameplaySession(fixtureConfig);
   const world = new MapWorld(gameplaySession, {
     game: {},
     createRaycaster: fakeCreateRaycaster,
   });
-  world.buildWorld();
+  await world.buildWorld();
   return world;
 }
 
-function testSinglePlayerSessionUsesAuthoredPlayerEntity() {
-  const session = buildSession(singlePlayerSession);
+async function testSinglePlayerSessionUsesAuthoredPlayerEntity() {
+  const session = await buildSession(singlePlayerSession);
 
   assert.equal(session.playerEntities.size, 1);
   const playerEntity = session.playerEntities.get("player-1");
@@ -45,21 +55,21 @@ function testSinglePlayerSessionUsesAuthoredPlayerEntity() {
 
   // No "player" prefab spawn should have been needed -- the authored
   // entity from testEntities.js already satisfies it.
-  assert.equal(
-    session.entities.filter((e) => e.id === "player-1").length,
-    1,
-  );
+  assert.equal(session.entities.filter((e) => e.id === "player-1").length, 1);
 }
 
-function testCoopSessionSpawnsSecondPlayerDynamically() {
-  const session = buildSession(coopSession);
+async function testCoopSessionSpawnsSecondPlayerDynamically() {
+  const session = await buildSession(coopSession);
 
   assert.equal(session.playerEntities.size, 2);
   const player1 = session.playerEntities.get("player-1");
   const player2 = session.playerEntities.get("player-2");
 
   assert.ok(player1, "player-1 should resolve to the authored entity");
-  assert.ok(player2, "player-2 should be spawned dynamically, no authored entity for it");
+  assert.ok(
+    player2,
+    "player-2 should be spawned dynamically, no authored entity for it",
+  );
 
   // Dynamically spawned via the "players" zone -- should have a resolved
   // MovementComponent position, not be missing one.
@@ -69,19 +79,25 @@ function testCoopSessionSpawnsSecondPlayerDynamically() {
   assert.equal(typeof movement.y, "number");
 }
 
-function testBotCountDrivesSpawnCountWithoutCodeChanges() {
+async function testBotCountDrivesSpawnCountWithoutCodeChanges() {
   const countBots = (session) =>
     session.entities.filter((entity) => entity.id.startsWith("bot_")).length;
 
-  const lowSession = buildSession({ ...deathmatchBotSession, botCount: 2 });
-  const highSession = buildSession({ ...deathmatchBotSession, botCount: 6 });
+  const lowSession = await buildSession({
+    ...deathmatchBotSession,
+    botCount: 2,
+  });
+  const highSession = await buildSession({
+    ...deathmatchBotSession,
+    botCount: 6,
+  });
 
   assert.equal(countBots(lowSession), 2);
   assert.equal(countBots(highSession), 6);
 }
 
-function testDeathmatchSessionHasNoAuthoredEntitiesOnlyPlayerAndBots() {
-  const session = buildSession(deathmatchBotSession);
+async function testDeathmatchSessionHasNoAuthoredEntitiesOnlyPlayerAndBots() {
+  const session = await buildSession(deathmatchBotSession);
 
   // Bots are players controlled by AI, not a separate population --
   // playerEntities includes the human and every bot.
@@ -93,8 +109,8 @@ function testDeathmatchSessionHasNoAuthoredEntitiesOnlyPlayerAndBots() {
   );
 }
 
-function testBotsAreSpawnedAsPlayerEntitiesWithAIComponent() {
-  const session = buildSession(deathmatchBotSession);
+async function testBotsAreSpawnedAsPlayerEntitiesWithAIComponent() {
+  const session = await buildSession(deathmatchBotSession);
 
   // A bot is a player controlled by AI -- it must be a member of the
   // player population (playerEntities), not just present in the world.
@@ -107,13 +123,19 @@ function testBotsAreSpawnedAsPlayerEntitiesWithAIComponent() {
       bot.getComponent("AIComponent"),
       `bot_${i} should have an AIComponent -- it's AI-controlled, not a special entity type`,
     );
-    assert.ok(bot.getComponent("HealthComponent"), "bots get the ordinary player prefab");
-    assert.ok(bot.getComponent("InventoryComponent"), "bots get the ordinary player prefab");
+    assert.ok(
+      bot.getComponent("HealthComponent"),
+      "bots get the ordinary player prefab",
+    );
+    assert.ok(
+      bot.getComponent("InventoryComponent"),
+      "bots get the ordinary player prefab",
+    );
   }
 }
 
-function testControllerAndTeamAreOrthogonal() {
-  const session = buildSession(deathmatchBotSession);
+async function testControllerAndTeamAreOrthogonal() {
+  const session = await buildSession(deathmatchBotSession);
 
   const human = session.playerEntities.get("player-1");
   const bot = session.playerEntities.get("bot_0");
@@ -128,19 +150,22 @@ function testControllerAndTeamAreOrthogonal() {
   assert.ok(bot.getComponent("AIComponent"));
 }
 
-function testSinglePlayerSessionHasNoBotsOrAIComponents() {
+async function testSinglePlayerSessionHasNoBotsOrAIComponents() {
   // Sessions with no botCount/controller fields at all must behave
   // exactly as before -- controller defaults to "human" and nobody gets
   // an AIComponent.
-  const session = buildSession(singlePlayerSession);
+  const session = await buildSession(singlePlayerSession);
 
   const human = session.playerEntities.get("player-1");
   assert.equal(human.getComponent("AIComponent"), undefined);
-  assert.equal(session.sessionPlayers.every((p) => p.controller === "human"), true);
+  assert.equal(
+    session.sessionPlayers.every((p) => p.controller === "human"),
+    true,
+  );
 }
 
-function testSessionModifiersApplyToAllPlayersBotModifiersOnlyToBots() {
-  const session = buildSession({
+async function testSessionModifiersApplyToAllPlayersBotModifiersOnlyToBots() {
+  const session = await buildSession({
     gameMode: "deathmatch",
     map: "testMap",
     players: [{ id: "player-1" }],
@@ -159,8 +184,8 @@ function testSessionModifiersApplyToAllPlayersBotModifiersOnlyToBots() {
   assert.equal(bot.getComponent("HealthComponent").maximum, 150);
 }
 
-function testPlayerModifiersOverrideSessionModifiersButBotModifiersStillWinForBots() {
-  const session = buildSession({
+async function testPlayerModifiersOverrideSessionModifiersButBotModifiersStillWinForBots() {
+  const session = await buildSession({
     gameMode: "deathmatch",
     map: "testMap",
     players: [{ id: "player-1", modifiers: { healthMultiplier: 2 } }],
@@ -179,11 +204,11 @@ function testPlayerModifiersOverrideSessionModifiersButBotModifiersStillWinForBo
   assert.equal(bot.getComponent("HealthComponent").maximum, 150);
 }
 
-function testBotsWithNoStateDoNotCrashAndGetNoResourceComponent() {
+async function testBotsWithNoStateDoNotCrashAndGetNoResourceComponent() {
   // Regression: bots have no `state` at all (resolveSessionPlayers()
   // never gives them one) -- buildWorld() must not assume every player
   // has `state.resources` to read.
-  const session = buildSession(deathmatchBotSession);
+  const session = await buildSession(deathmatchBotSession);
 
   const bot = session.playerEntities.get("bot_0");
   assert.ok(bot, "buildWorld() must not throw for a stateless bot");
@@ -234,7 +259,7 @@ const tests = [
 ];
 
 for (const [name, test] of tests) {
-  test();
+  await test();
   console.log(`PASS ${name}`);
 }
 

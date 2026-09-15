@@ -6,17 +6,16 @@
 // new texture; a future asset browser can replace it entirely without
 // touching anything else in the editor.
 //
-// Served read-only from the repo's assets/ folder via the dev server's
-// /game-assets/* passthrough -- see server/devApiPlugin.js.
+// Served read-only from the repo's assets/ folder through Vite's publicDir.
 export const editorAssets = {
-  wallTexture: "/game-assets/textures/wall.png",
-  floorTexture: "/game-assets/textures/floor.png",
-  ceilingTexture: "/game-assets/textures/ceiling.png",
-  brickTexture: "/game-assets/textures/brick.png",
-  skyTexture: "/game-assets/textures/sky.png",
-  doorTexture: "/game-assets/textures/door.png",
-  wallXTexture: "/game-assets/textures/wall_cross_yellow.png",
-  health: "/game-assets/items/health.png",
-  keyRed: "/game-assets/items/key_red.png",
-  wallTexture3: "/game-assets/textures/m-002.png",
+  wallTexture: "/textures/wall.png",
+  floorTexture: "/textures/floor.png",
+  ceilingTexture: "/textures/ceiling.png",
+  brickTexture: "/textures/brick.png",
+  skyTexture: "/textures/sky.png",
+  doorTexture: "/textures/door.png",
+  wallXTexture: "/textures/wall_cross_yellow.png",
+  health: "/items/health.png",
+  keyRed: "/items/key_red.png",
+  wallTexture3: "/textures/m-002.png",
 };

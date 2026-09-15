@@ -2,9 +2,9 @@
 
 A small React app for authoring the game's map, entity, and entity-template
 JSON by hand-editing controls instead of raw JSON. It is isolated from the
-game (`scripts/editor/` is its own npm project) and only ever touches JSON
-files under `scripts/data/` — it never imports or modifies the game's
-runtime `.js` modules, `boot.js`, or ECS component classes.
+game (`scripts/editor/` is its own npm project) and communicates with the
+remote content server for JSON documents. It never imports or modifies the
+game's runtime `.js` modules, `boot.js`, or ECS component classes.
 
 ## Run it
 
@@ -19,14 +19,14 @@ in `dist/` (not required for day-to-day use — the dev server is the tool).
 
 ## The three documents
 
-The editor edits three independent JSON document types, each its own
-folder under `scripts/data/`, each with its own Load/Save/New toolbar:
+The editor edits three independent JSON document types through the remote
+content server, each with its own Load/Save/New toolbar:
 
-| Type        | Folder                    | Shape                                          |
-|-------------|----------------------------|-------------------------------------------------|
-| `maps`      | `scripts/data/maps/`       | one map: grid, cells, spawn points/zones        |
-| `entities`  | `scripts/data/entities/`   | an array of authored entities                   |
-| `templates` | `scripts/data/templates/`  | `{ typeName: { componentName: data } }`         |
+| Type        | Server type | Shape                                    |
+| ----------- | ----------- | ---------------------------------------- |
+| `maps`      | `maps`      | one map: grid, cells, spawn points/zones |
+| `entities`  | `entities`  | an array of authored entities            |
+| `templates` | `templates` | `{ typeName: { componentName: data } }`  |
 
 They are **never merged**. A map only ever references spawn points by
 name; entities only ever reference spawn points and templates by name.
@@ -35,20 +35,19 @@ document's shape from inside one editor.
 
 Nothing here is the game's live data. `scripts/data/testMap.js`,
 `testEntities.js`, and `SharedData.js` are still what `boot.js` /
-`sessions.js` load at runtime. The JSON files were seeded from them once;
-editing JSON here doesn't change the running game until someone manually
-carries a change back into the `.js` files (or a future task wires the
-game to load JSON directly).
+`sessions.js` load at runtime; editing a remote document does not change
+those runtime `.js` files.
 
 ## How a document flows through the app
 
 `src/state/useDocument.js` is the one hook both `App.jsx` and every view
 build on. It owns exactly four things for one document: `data`, `fileName`,
-`dirty`, and the list of files on disk. Everything else — grid painting,
+`dirty`, and the list of available remote documents. Everything else — grid
+painting,
 component editing, spawn zones — is just calling:
 
 ```js
-doc.update((prevData) => nextData)
+doc.update((prevData) => nextData);
 ```
 
 `App.jsx` creates one `useDocument()` per type and renders `MapView`,
@@ -57,21 +56,16 @@ hidden with `display: none`, not unmounted. That's why switching tabs never
 loses your current cell/entity/template selection or an unsaved edit sitting
 in a text box.
 
-Persistence is a tiny custom Vite middleware (`server/devApiPlugin.js`):
-`GET /api/<type>` lists files, `GET /api/<type>/<name>` reads one,
-`PUT /api/<type>/<name>` writes one (pretty-printed JSON, directory
-created on demand). Document names are restricted to
-`[a-zA-Z0-9_-]` — there's no path-traversal surface to worry about there.
-`GET /game-assets/<path>` is a second, read-only passthrough to the
-repo's `assets/` folder, used only for texture thumbnails.
+Persistence uses the content server configured in `src/io/api.js`:
+`GET /api/projects/<project>/<type>` lists documents,
+`GET /api/projects/<project>/<type>/<name>` reads one, and
+`PUT /api/projects/{project}/{type}/{name}` writes one. Set
+`VITE_CONTENT_SERVER_URL` and `VITE_CONTENT_PROJECT` to override their
+defaults of `http://lynn2:4000` and `raycaster`.
 
-**If you touch `vite.config.js`'s `server.fs.allow`, be careful**: widening
-it once (to let a component import a game file directly) let a crafted
-request path escape the project root and serve arbitrary source files —
-found and fixed during development. The editor doesn't need it at all
-right now; keep it that way unless there's a real cross-project import to
-justify it, and if you add one, scope `fs.allow` to the *exact* directory
-needed, never a parent that also contains anything sensitive.
+The editor has no persistence middleware or local content filesystem. The
+Vite server serves the editor application and exposes the repository's
+`assets/` directory as read-only static files for texture previews.
 
 ## Unknown properties are never silently dropped
 
@@ -81,7 +75,7 @@ of "known" keys (see `KNOWN_KEYS` near the top of `MapProperties.jsx`,
 for those. Everything else on the same object round-trips through
 `src/common/JsonFieldEditor.jsx` under an "Other properties" heading —
 `pickRest`/`pickKnown` in `src/common/objectUtils.js` do the splitting.
-Component bodies (`ComponentEditor.jsx`) are *always* edited this way —
+Component bodies (`ComponentEditor.jsx`) are _always_ edited this way —
 there's no explicit form for component internals, just JSON.
 
 This is the load-bearing convention for extensibility: **a new property
@@ -124,19 +118,19 @@ manually-maintained, editor-only lookup — it is deliberately not generated
 from `boot.js` (that file stays untouched and Phaser-specific) and is
 isolated enough to be swapped for a real asset browser later.
 
-**A whole new document type** (rare): add a directory constant in
-`devApiPlugin.js`'s `dataDirs`, add a `useDocument("newtype", createEmpty)`
-call in `App.jsx`, add a tab, add a view. Copy `TemplatesView.jsx` as the
-starting point — it's the smallest of the three.
+**A whole new document type** (rare): add a
+`useDocument("newtype", createEmpty)` call in `App.jsx`, add a tab, and add
+view. The remote content server must also register the new type. Copy
+`TemplatesView.jsx` as the starting point — it's the smallest of the three.
 
 ## Conventions worth knowing before you change grid/entity code
 
 - Grid cell ids are single ASCII digits (`"0"`–`"9"`) because the map's
   `map` rows are strings, one character per cell (`mapGrid.js`). This
   matches the existing game data format on purpose — don't switch to
-  multi-character ids without a real reason, since it'd change what
-  `scripts/data/maps/*.json` looks like on disk.
-- Spawn zones store point *names*, never point data. `map/spawnPoints.js`'s
+  multi-character ids without a real reason, since it would change the
+  document structure sent to the content server.
+- Spawn zones store point _names_, never point data. `map/spawnPoints.js`'s
   `renameSpawnPoint`/`removeSpawnPoint` keep zones in sync when a point is
   renamed or deleted — route any new point-mutating code through those
   instead of touching `spawnPoints/spawnZones` separately.

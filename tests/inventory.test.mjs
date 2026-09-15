@@ -33,7 +33,10 @@ function testAddIsIdempotent() {
   const entity = makeInventoryEntity("inv_add", { items: ["pistol"] });
   inventorySystem.add(entity, "shotgun");
   inventorySystem.add(entity, "shotgun");
-  assert.deepEqual(inventorySystem.getInventory(entity).items, ["pistol", "shotgun"]);
+  assert.deepEqual(inventorySystem.getInventory(entity).items, [
+    "pistol",
+    "shotgun",
+  ]);
 }
 
 function testRemoveClearsEquippedWhenItWasTheRemovedItem() {
@@ -48,7 +51,9 @@ function testRemoveClearsEquippedWhenItWasTheRemovedItem() {
 }
 
 function testRemoveOfUnownedItemReturnsFalse() {
-  const entity = makeInventoryEntity("inv_remove_unowned", { items: ["pistol"] });
+  const entity = makeInventoryEntity("inv_remove_unowned", {
+    items: ["pistol"],
+  });
   assert.equal(inventorySystem.remove(entity, "shotgun"), false);
 }
 
@@ -60,7 +65,9 @@ function testEquipRefusesUnownedItem() {
 }
 
 function testEquipSucceedsForOwnedItem() {
-  const entity = makeInventoryEntity("inv_equip_ok", { items: ["pistol", "shotgun"] });
+  const entity = makeInventoryEntity("inv_equip_ok", {
+    items: ["pistol", "shotgun"],
+  });
   inventorySystem.equip(entity, "shotgun");
   assert.equal(inventorySystem.getEquipped(entity), "shotgun");
 }
@@ -98,18 +105,18 @@ const minimalMapData = {
   },
 };
 
-function buildSession(session) {
+async function buildSession(session) {
   const gameplaySession = new GameplaySession(session);
   const world = new MapWorld(gameplaySession, {
     game: {},
     createRaycaster: fakeCreateRaycaster,
   });
-  world.buildWorld();
+  await world.buildWorld();
   return world;
 }
 
-function testAuthoredInventoryOverrideBeatsPersistent() {
-  const session = buildSession({
+async function testAuthoredInventoryOverrideBeatsPersistent() {
+  const session = await buildSession({
     gameMode: "singleplayer",
     map: minimalMapData,
     entities: [
@@ -118,12 +125,18 @@ function testAuthoredInventoryOverrideBeatsPersistent() {
         uniqueId: "player-1",
         components: {
           SpawnComponent: { point: "playerStart" },
-          InventoryComponent: { items: ["pistol", "shotgun"], equipped: "shotgun" },
+          InventoryComponent: {
+            items: ["pistol", "shotgun"],
+            equipped: "shotgun",
+          },
         },
       },
     ],
     players: [
-      { id: "player-1", state: { inventory: { items: ["pistol"], equipped: "pistol" } } },
+      {
+        id: "player-1",
+        state: { inventory: { items: ["pistol"], equipped: "pistol" } },
+      },
     ],
   });
 
@@ -133,15 +146,17 @@ function testAuthoredInventoryOverrideBeatsPersistent() {
   assert.equal(inventory.equipped, "shotgun");
 }
 
-function testPersistentInventoryFlowsInWhenNoAuthoredOverride() {
-  const session = buildSession({
+async function testPersistentInventoryFlowsInWhenNoAuthoredOverride() {
+  const session = await buildSession({
     gameMode: "deathmatch",
     map: minimalMapData,
     entities: [],
     players: [
       {
         id: "player-1",
-        state: { inventory: { items: ["pistol", "shotgun"], equipped: "shotgun" } },
+        state: {
+          inventory: { items: ["pistol", "shotgun"], equipped: "shotgun" },
+        },
       },
     ],
   });
@@ -152,8 +167,8 @@ function testPersistentInventoryFlowsInWhenNoAuthoredOverride() {
   assert.equal(inventory.equipped, "shotgun");
 }
 
-function testComponentDefaultsAreTheFinalFallback() {
-  const session = buildSession({
+async function testComponentDefaultsAreTheFinalFallback() {
+  const session = await buildSession({
     gameMode: "deathmatch",
     map: minimalMapData,
     entities: [],
@@ -174,10 +189,22 @@ const tests = [
     "InventorySystem.remove clears .equipped when it was the removed item",
     testRemoveClearsEquippedWhenItWasTheRemovedItem,
   ],
-  ["InventorySystem.remove of an unowned item returns false", testRemoveOfUnownedItemReturnsFalse],
-  ["InventorySystem.equip refuses an unowned item", testEquipRefusesUnownedItem],
-  ["InventorySystem.equip succeeds for an owned item", testEquipSucceedsForOwnedItem],
-  ["InventorySystem.getSnapshot returns an independent plain copy", testGetSnapshotReturnsPlainCopy],
+  [
+    "InventorySystem.remove of an unowned item returns false",
+    testRemoveOfUnownedItemReturnsFalse,
+  ],
+  [
+    "InventorySystem.equip refuses an unowned item",
+    testEquipRefusesUnownedItem,
+  ],
+  [
+    "InventorySystem.equip succeeds for an owned item",
+    testEquipSucceedsForOwnedItem,
+  ],
+  [
+    "InventorySystem.getSnapshot returns an independent plain copy",
+    testGetSnapshotReturnsPlainCopy,
+  ],
   [
     "MapWorld: authored InventoryComponent override beats persistent inventory",
     testAuthoredInventoryOverrideBeatsPersistent,
@@ -193,7 +220,7 @@ const tests = [
 ];
 
 for (const [name, test] of tests) {
-  test();
+  await test();
   console.log(`PASS ${name}`);
 }
 
