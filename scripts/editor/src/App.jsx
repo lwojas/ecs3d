@@ -7,6 +7,7 @@ import Toolbar from "./common/Toolbar.jsx";
 import MapView from "./map/MapView.jsx";
 import EntityView from "./entities/EntityView.jsx";
 import TemplatesView from "./templates/TemplatesView.jsx";
+import { useEditorAssets } from "./EditorAssetsContext.jsx";
 
 const TABS = [
   { id: "map", label: "Map" },
@@ -20,6 +21,7 @@ const TABS = [
 // views stay mounted and are only hidden with CSS when inactive, so
 // switching tabs never discards in-progress edits or loses selection.
 export default function App() {
+  const { loading, error } = useEditorAssets();
   const [activeTab, setActiveTab] = useState("map");
   const mapDoc = useDocument("maps", createEmptyMap);
   const entitiesDoc = useDocument("entities", createEmptyEntities);
@@ -33,7 +35,11 @@ export default function App() {
   }, []);
 
   const spawnPointNames = Object.keys(mapDoc.data?.spawnPoints ?? {});
-  const docsByTab = { map: mapDoc, entities: entitiesDoc, templates: templatesDoc };
+  const docsByTab = {
+    map: mapDoc,
+    entities: entitiesDoc,
+    templates: templatesDoc,
+  };
   const activeTabInfo = TABS.find((tab) => tab.id === activeTab);
 
   return (
@@ -55,11 +61,21 @@ export default function App() {
 
       <Toolbar label={activeTabInfo.label} doc={docsByTab[activeTab]} />
 
+      {(loading || error) && (
+        <div className="asset-status" role={error ? "alert" : "status"}>
+          {loading
+            ? "Loading assets..."
+            : `Asset previews unavailable: ${error.message}`}
+        </div>
+      )}
+
       <main className="app-main">
         <div style={{ display: activeTab === "map" ? "contents" : "none" }}>
           <MapView doc={mapDoc} />
         </div>
-        <div style={{ display: activeTab === "entities" ? "contents" : "none" }}>
+        <div
+          style={{ display: activeTab === "entities" ? "contents" : "none" }}
+        >
           <EntityView
             doc={entitiesDoc}
             spawnPointNames={spawnPointNames}
@@ -67,7 +83,9 @@ export default function App() {
             mapData={mapDoc.data}
           />
         </div>
-        <div style={{ display: activeTab === "templates" ? "contents" : "none" }}>
+        <div
+          style={{ display: activeTab === "templates" ? "contents" : "none" }}
+        >
           <TemplatesView doc={templatesDoc} />
         </div>
       </main>

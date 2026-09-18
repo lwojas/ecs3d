@@ -10,6 +10,7 @@ COPY scripts/services ./scripts/services
 COPY scripts/tools ./scripts/tools
 COPY scripts/components ./scripts/components
 COPY scripts/editor ./scripts/editor
+COPY scripts/api ./scripts/api
 
 
 ARG VITE_CONTENT_SERVER_URL=http://lynn2:4000

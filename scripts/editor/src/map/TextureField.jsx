@@ -1,12 +1,12 @@
 import React, { useId } from "react";
-import { editorAssets } from "../data/editorAssets.js";
+import { useEditorAssets } from "../EditorAssetsContext.jsx";
 
-// Free-text texture-key input with a datalist of known keys (from
-// editorAssets.js) plus a live thumbnail -- not a rigid dropdown, since
-// new textures will show up before the editor's lookup knows about them.
+// Free-text texture-key input with a datalist of known keys plus a live
+// thumbnail -- not a rigid dropdown, since maps may use new asset keys.
 export default function TextureField({ value, onChange }) {
+  const { assets } = useEditorAssets();
   const listId = useId();
-  const previewUrl = value && editorAssets[value];
+  const previewUrl = value && assets[value];
 
   return (
     <label className="field inline texture-field">
@@ -18,7 +18,7 @@ export default function TextureField({ value, onChange }) {
         placeholder="textureKey"
       />
       <datalist id={listId}>
-        {Object.keys(editorAssets).map((key) => (
+        {Object.keys(assets).map((key) => (
           <option key={key} value={key} />
         ))}
       </datalist>

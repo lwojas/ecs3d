@@ -112,11 +112,9 @@ the only place that knows how to look a template up — reuse it rather than
 reaching into `templatesDoc.data` directly if you add another component
 that needs a template.
 
-**A new texture/asset**: add a `key: url` entry to `src/data/editorAssets.js`,
-mirroring whatever `boot.js`'s `preload()` loads it as. This file is a
-manually-maintained, editor-only lookup — it is deliberately not generated
-from `boot.js` (that file stays untouched and Phaser-specific) and is
-isolated enough to be swapped for a real asset browser later.
+**A new texture/asset**: add it to the asset server manifest using the same
+`assetKey` expected by the game and editor. The editor loads the manifest at
+startup, so no editor source change is needed.
 
 **A whole new document type** (rare): add a
 `useDocument("newtype", createEmpty)` call in `App.jsx`, add a tab, and add

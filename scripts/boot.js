@@ -4,6 +4,7 @@ import { SinglePlayerWhiteroom } from "./level-singleplayer-whiteroom.js";
 import { MultiplayerWhiteroom } from "./level-multiplayer-whiteroom.js";
 import { GameMenu } from "./ui/GameMenu.js";
 import { Scoreboard } from "./ui/Scoreboard.js";
+import { loadAssets } from "./api/assets/assetClient.js";
 
 // Which Phaser state hosts a given gameMode's gameplay -- the only
 // mapping the application layer needs; everything else about a mode
@@ -13,6 +14,8 @@ const STATE_BY_MODE = {
   deathmatch: "MultiplayerWhiteroom",
 };
 const DEFAULT_GAMEPLAY_STATE = "SinglePlayerWhiteroom";
+
+const LOCAL_MODE = false;
 
 BasicGame.Boot = function (game) {};
 
@@ -24,48 +27,48 @@ BasicGame.Boot.prototype = {
     this.game.stage.smoothed = false;
   },
 
-  preload: function () {
-    this.load.spritesheet("Cobra", "assets/_ship_default.png", 32, 32);
-    this.load.image("wallTexture", "assets/textures/wall.png");
-    this.load.image("floorTexture", "assets/textures/floor.png");
-    this.load.image("ceilingTexture", "assets/textures/ceiling.png");
-    this.load.image("brickTexture", "assets/textures/brick.png");
-    this.load.image("skyTexture", "assets/textures/sky.png");
-    this.load.image("pixelWhite", "assets/_pixel_white.png");
-    this.load.image("Plasma", "assets/projectiles/plasma.png");
-    this.load.image("doorTexture", "assets/textures/door.png");
-    this.load.image("wallXTexture", "assets/textures/wall_cross_yellow.png");
-    this.load.image("wallTexture3", "assets/textures/m-002.png");
-    this.load.image("health", "assets/items/health.png");
-    this.load.image("keyRed", "assets/items/key_red.png");
-    this.load.image("bloodDrop", "assets/particles/blood.png");
-    this.load.image("portal", "assets/mapObjects/portal.png");
-    this.load.image("enemy1_frame0", "assets/npc/cobra0.png");
-    this.load.image("enemy1_frame1", "assets/npc/cobra1.png");
-    this.load.image("enemy1_frame2", "assets/npc/cobra2.png");
-    this.load.image("enemy1_attack0", "assets/npc/cobraatt0.png");
-    this.load.image("enemy1_attack1", "assets/npc/cobraatt1.png");
-    this.load.image("enemy1_attack2", "assets/npc/cobraatt2.png");
-    this.load.image("portalParticle", "assets/particles/portalParticle.png");
-
-    // Audio
-    this.load.audio("sfx_pickup", "assets/audio/gui/positive.wav");
-
-    this.load.spritesheet(
-      "hudShotgun",
-      "assets/hud/item_shotgun.png",
-      130,
-      200,
-    );
-
-    this.load.spritesheet(
-      "hudDecoupler",
-      "assets/hud/item_plasma_decoupler.png",
-      130,
-      200,
-    );
-
-    // this.load.image("dysonLight", "assets/_light_ship2.png");
+  preload: async function () {
+    if (!LOCAL_MODE) {
+      await loadAssets(this);
+    } else {
+      this.load.spritesheet("Cobra", "assets/_ship_default.png", 32, 32);
+      this.load.image("wallTexture", "assets/textures/wall.png");
+      this.load.image("floorTexture", "assets/textures/floor.png");
+      this.load.image("ceilingTexture", "assets/textures/ceiling.png");
+      this.load.image("brickTexture", "assets/textures/brick.png");
+      this.load.image("skyTexture", "assets/textures/sky.png");
+      this.load.image("pixelWhite", "assets/_pixel_white.png");
+      this.load.image("Plasma", "assets/projectiles/plasma.png");
+      this.load.image("doorTexture", "assets/textures/door.png");
+      this.load.image("wallXTexture", "assets/textures/wall_cross_yellow.png");
+      this.load.image("wallTexture3", "assets/textures/m-002.png");
+      this.load.image("health", "assets/items/health.png");
+      this.load.image("keyRed", "assets/items/key_red.png");
+      this.load.image("bloodDrop", "assets/particles/blood.png");
+      this.load.image("portal", "assets/mapObjects/portal.png");
+      this.load.image("enemy1_frame0", "assets/npc/cobra0.png");
+      this.load.image("enemy1_frame1", "assets/npc/cobra1.png");
+      this.load.image("enemy1_frame2", "assets/npc/cobra2.png");
+      this.load.image("enemy1_attack0", "assets/npc/cobraatt0.png");
+      this.load.image("enemy1_attack1", "assets/npc/cobraatt1.png");
+      this.load.image("enemy1_attack2", "assets/npc/cobraatt2.png");
+      this.load.image("portalParticle", "assets/particles/portalParticle.png");
+      // Audio
+      this.load.audio("sfx_pickup", "assets/audio/gui/positive.wav");
+      this.load.spritesheet(
+        "hudShotgun",
+        "assets/hud/item_shotgun.png",
+        130,
+        200,
+      );
+      this.load.spritesheet(
+        "hudDecoupler",
+        "assets/hud/item_plasma_decoupler.png",
+        130,
+        200,
+      );
+      this.load.image("dysonLight", "assets/_light_ship2.png");
+    }
   },
 
   create: function () {

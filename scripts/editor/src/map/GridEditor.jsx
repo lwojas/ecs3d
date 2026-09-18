@@ -1,11 +1,11 @@
 import React, { useRef, useState } from "react";
-import { editorAssets } from "../data/editorAssets.js";
+import { useEditorAssets } from "../EditorAssetsContext.jsx";
 
 const CELL_PX = 28;
 
-function cellBackground(cellDef) {
+function cellBackground(cellDef, assets) {
   const textureKey = cellDef?.wall?.texture || cellDef?.floor?.texture;
-  const url = textureKey && editorAssets[textureKey];
+  const url = textureKey && assets[textureKey];
   if (url) return { backgroundImage: `url(${url})`, backgroundSize: "cover" };
   if (cellDef?.wall) return { backgroundColor: "#565660" };
   if (cellDef?.sections?.length) return { backgroundColor: "#4c5a78" };
@@ -33,6 +33,7 @@ export default function GridEditor({
   onSelectSpawnPoint,
   onMoveSpawnPoint,
 }) {
+  const { assets } = useEditorAssets();
   const containerRef = useRef(null);
   const paintingRef = useRef(false);
   const [draggingPoint, setDraggingPoint] = useState(null);
@@ -73,7 +74,11 @@ export default function GridEditor({
             <div
               key={`${x}-${y}`}
               className="grid-cell"
-              style={{ width: CELL_PX, height: CELL_PX, ...cellBackground(map.cells[tileId]) }}
+              style={{
+                width: CELL_PX,
+                height: CELL_PX,
+                ...cellBackground(map.cells[tileId], assets),
+              }}
               onPointerDown={() => {
                 paintingRef.current = true;
                 paintAt(x, y);
@@ -91,7 +96,11 @@ export default function GridEditor({
         {Object.entries(map.spawnPoints ?? {}).map(([name, point]) => (
           <div
             key={name}
-            className={name === selectedSpawnPoint ? "spawn-marker selected" : "spawn-marker"}
+            className={
+              name === selectedSpawnPoint
+                ? "spawn-marker selected"
+                : "spawn-marker"
+            }
             style={{ left: point.cellX * CELL_PX, top: point.cellY * CELL_PX }}
             onPointerDown={(e) => {
               e.stopPropagation();
