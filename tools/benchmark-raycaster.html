@@ -1,0 +1,344 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Raycaster JS / WASM / WebGL benchmark</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #111; color: #eee; }
+  h1 { font-size: 1.1rem; }
+  pre { background: #000; color: #9cffb0; padding: 1rem; white-space: pre-wrap; }
+  button { font-size: 1rem; padding: 0.5rem 1rem; }
+  .note { color: #999; max-width: 60ch; }
+</style>
+</head>
+<body>
+<h1>Raycaster JS / WASM / WebGL frame-time benchmark</h1>
+<p class="note">
+  This is a browser-only companion to <code>tools/benchmark-raycaster.mjs</code>
+  (which can only compare JS vs. WASM under Node -- there's no real GPU there).
+  It builds the same shaped scene (see <code>buildBenchmarkLevel()</code> below,
+  matching the Node script's level/sprites/camera sweep) and drives all three
+  renderers -- JS, WASM, and WebGL -- back to back at the same internal
+  resolution, in this actual browser/GPU. Open this page via
+  <code>npm start</code> (not <code>file://</code>, so the WASM module and its
+  relative <code>.wasm</code> fetch resolve correctly), then press "Run
+  benchmark". On a Chromebook or other low-power device, run it there
+  directly -- the whole point is real, on-device numbers, not an assumption.
+</p>
+<button id="run">Run benchmark</button>
+<pre id="output">(not run yet)</pre>
+
+<script type="module">
+import { Raycaster } from "../scripts/system/Raycaster.js";
+import { WebGLRenderer } from "../scripts/system/WebGLRenderer.js";
+
+const WARMUP_FRAMES = 30;
+const MEASURED_FRAMES = 500;
+const YIELD_EVERY = 40; // keep the tab responsive during the run
+
+// Raycaster only needs a Phaser.Game-*shaped* object (see
+// tests/wasm-render-parity.test.mjs / tools/benchmark-raycaster.mjs's own
+// createFakeGame()) -- this page never actually displays a Phaser scene, so
+// it doesn't load Phaser at all. The webgl renderer path does reach for a
+// global `PIXI.Texture.fromCanvas(...)` (see Raycaster.js's renderer-
+// selection block) purely to wire its canvas up as a sprite texture for
+// display; since nothing here is ever shown, a trivial stand-in is enough.
+window.PIXI = { Texture: { fromCanvas: (canvas) => ({ canvas }) } };
+
+function makeTextureCanvas(width, height, draw) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  draw(canvas.getContext("2d"), width, height);
+  return canvas;
+}
+
+function buildTextures() {
+  return {
+    wallTexture: makeTextureCanvas(8, 8, (ctx) => {
+      ctx.fillStyle = "#a05028";
+      ctx.fillRect(0, 0, 8, 8);
+      ctx.fillStyle = "#c07038";
+      for (let y = 0; y < 8; y += 2) ctx.fillRect(0, y, 8, 1);
+    }),
+    floorTexture: makeTextureCanvas(8, 8, (ctx) => {
+      ctx.fillStyle = "#286028";
+      ctx.fillRect(0, 0, 8, 8);
+      ctx.fillStyle = "#3c8c3c";
+      ctx.fillRect(0, 0, 4, 4);
+      ctx.fillRect(4, 4, 4, 4);
+    }),
+    ceilingTexture: makeTextureCanvas(8, 8, (ctx) => {
+      ctx.fillStyle = "#28407c";
+      ctx.fillRect(0, 0, 8, 8);
+    }),
+    skyTexture: makeTextureCanvas(16, 8, (ctx) => {
+      const gradient = ctx.createLinearGradient(0, 0, 16, 0);
+      gradient.addColorStop(0, "#2c1e5a");
+      gradient.addColorStop(0.5, "#7a4ea8");
+      gradient.addColorStop(1, "#2c1e5a");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 16, 8);
+    }),
+    spriteTexture: makeTextureCanvas(8, 8, (ctx) => {
+      ctx.clearRect(0, 0, 8, 8);
+      ctx.fillStyle = "#e0c040";
+      ctx.fillRect(1, 1, 6, 6);
+    }),
+  };
+}
+
+function createFakeGame(textures) {
+  return {
+    width: 640,
+    height: 480,
+    add: {
+      sprite() {
+        return { loadTexture() {}, smoothed: true, scale: { set() {} }, destroy() {} };
+      },
+      bitmapData() {
+        return { context: { putImageData() {} }, dirty: false };
+      },
+    },
+    cache: {
+      getImage(key) {
+        return textures[key] ?? textures.wallTexture;
+      },
+    },
+  };
+}
+
+// Mirrors tools/benchmark-raycaster.mjs's buildBenchmarkLevel()/
+// buildSprites()/cameraForFrame() exactly (same map, heights, fog, sky,
+// sprite layout, camera sweep formula) so a JS/WASM number measured there
+// is comparable in spirit to what this page measures for the same two
+// renderers, with WebGL added alongside using the real GPU.
+function buildBenchmarkLevel() {
+  const wall = { texture: "wallTexture", width: 4, height: 4 };
+  const floor = { texture: "floorTexture", width: 4, height: 4 };
+  const ceiling = { texture: "ceilingTexture", width: 4, height: 4 };
+  const rows = [
+    "################",
+    "#0000000030000##",
+    "#0111101010111##",
+    "#0100001010001##",
+    "#0100001210001##",
+    "#0100001010001##",
+    "#0111101010111##",
+    "#0000000030000##",
+    "#0000000000000##",
+    "################",
+  ];
+  return {
+    width: rows[0].length,
+    height: rows.length,
+    map: rows,
+    sky: { texture: "skyTexture" },
+    cells: {
+      0: {
+        floorHeight: 0,
+        ceilingHeight: 6,
+        floor,
+        ceiling,
+        fog: { distance: 24, color: { r: 30, g: 30, b: 50 } },
+      },
+      1: { floorHeight: 0, ceilingHeight: 6, wall },
+      2: {
+        floorHeight: 0,
+        ceilingHeight: 6,
+        sections: [
+          { bottom: 0, top: 1.5, material: wall },
+          { bottom: 4.5, top: 6, material: wall },
+        ],
+      },
+      3: { floorHeight: 0, ceilingHeight: 6, floor, ceiling: null },
+    },
+  };
+}
+
+function buildSprites() {
+  const sprites = [];
+  for (let i = 0; i < 6; i++) {
+    sprites.push({
+      x: 8 + (i % 3) * 8,
+      y: 8 + Math.floor(i / 3) * 20,
+      z: 0,
+      width: 1.5,
+      height: 1.5,
+      scale: 1,
+      texture: "spriteTexture",
+      billboard: i % 2 === 0,
+      angle: i * 0.5,
+    });
+  }
+  return sprites;
+}
+
+function cameraForFrame(frame) {
+  const t = frame * 0.05;
+  return {
+    x: 32 + Math.sin(t * 0.7) * 20,
+    y: 36 + Math.cos(t * 0.9) * 16,
+    z: 1,
+    angle: t * 0.6,
+    pitch: Math.sin(t * 0.3) * 15,
+    ambient: 0.5,
+    lights: [
+      { x: 32, y: 36, z: 1.5, radius: 18, intensity: 1.2, tint: { r: 255, g: 220, b: 180 } },
+    ],
+    sprites: buildSprites(),
+  };
+}
+
+function percentile(sortedValues, fraction) {
+  const index = Math.min(sortedValues.length - 1, Math.floor(sortedValues.length * fraction));
+  return sortedValues[index];
+}
+
+function summarize(samples) {
+  const sorted = Float64Array.from(samples).sort();
+  const sum = sorted.reduce((total, value) => total + value, 0);
+  const mean = sum / sorted.length;
+  const variance = sorted.reduce((total, value) => total + (value - mean) ** 2, 0) / sorted.length;
+  return {
+    count: sorted.length,
+    avg: mean,
+    stddev: Math.sqrt(variance),
+    min: sorted[0],
+    p50: percentile(sorted, 0.5),
+    p95: percentile(sorted, 0.95),
+    p99: percentile(sorted, 0.99),
+    max: sorted[sorted.length - 1],
+  };
+}
+
+function formatMs(value) {
+  return `${value.toFixed(3)}ms`;
+}
+
+function formatSummary(label, samples) {
+  const s = summarize(samples);
+  return (
+    `${label.padEnd(28)} avg=${formatMs(s.avg)} min=${formatMs(s.min)} ` +
+    `p50=${formatMs(s.p50)} p95=${formatMs(s.p95)} p99=${formatMs(s.p99)} ` +
+    `max=${formatMs(s.max)} stddev=${formatMs(s.stddev)} (n=${s.count})`
+  );
+}
+
+function yieldToBrowser() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+// Runs WARMUP_FRAMES (discarded, lets JIT/shader-compile/first-texture-
+// upload costs settle) then MEASURED_FRAMES of renderSnapshot(), yielding
+// to the browser periodically so the tab stays responsive during a long
+// run -- returns raw per-frame millisecond samples.
+async function benchmarkRenderer(raycaster, label) {
+  for (let frame = 0; frame < WARMUP_FRAMES; frame++) {
+    raycaster.renderSnapshot(cameraForFrame(frame));
+  }
+  const samples = [];
+  for (let frame = 0; frame < MEASURED_FRAMES; frame++) {
+    const camera = cameraForFrame(WARMUP_FRAMES + frame);
+    const start = performance.now();
+    raycaster.renderSnapshot(camera);
+    samples.push(performance.now() - start);
+    if (frame % YIELD_EVERY === 0) await yieldToBrowser();
+  }
+  return samples;
+}
+
+async function run(log) {
+  const level = buildBenchmarkLevel();
+  const textures = buildTextures();
+  const game = createFakeGame(textures);
+  // debug:false matters here, not just for realism (this is how the real
+  // game configures it, see scripts/api/session/MapWorld.js) -- WasmRenderer
+  // has no debugStats object of its own, so Raycaster.renderSnapshot()'s
+  // debug-timing block throws if debug is left at its default (true) for
+  // the wasm renderer. Pre-existing, unrelated to this benchmark; see this
+  // repo's WebGL implementation plan.
+  const options = { width: 240, height: 135, cellSize: 4, cameraHeight: 1, debug: false };
+
+  log("Constructing JS renderer...");
+  const jsRaycaster = new Raycaster(game, level, options);
+
+  log("Constructing WASM renderer (loading .wasm module)...");
+  const wasmRaycaster = new Raycaster(game, level, { ...options, renderer: "wasm" });
+  await wasmRaycaster.renderer.initializing;
+  if (!wasmRaycaster.renderer.ready) {
+    log(`WASM renderer failed to initialise: ${wasmRaycaster.renderer.failed}`);
+    return;
+  }
+
+  log("Constructing WebGL renderer...");
+  const webglRaycaster = new Raycaster(game, level, { ...options, renderer: "webgl" });
+  const webglReady = webglRaycaster.renderer instanceof WebGLRenderer && webglRaycaster.renderer.ready;
+  if (!webglReady) {
+    log(`WebGL renderer failed to initialise: ${webglRaycaster.renderer.failed}`);
+  }
+
+  log(`Running JS benchmark (${WARMUP_FRAMES} warmup + ${MEASURED_FRAMES} measured frames)...`);
+  const jsSamples = await benchmarkRenderer(jsRaycaster, "js");
+  log(formatSummary("SoftwareRenderer (JS)", jsSamples));
+
+  log("Running WASM benchmark...");
+  const wasmSamples = await benchmarkRenderer(wasmRaycaster, "wasm");
+  log(formatSummary("WasmRenderer", wasmSamples));
+
+  let webglSamples = null;
+  if (webglReady) {
+    log("Running WebGL benchmark...");
+    webglSamples = await benchmarkRenderer(webglRaycaster, "webgl");
+    log(formatSummary("WebGLRenderer", webglSamples));
+  }
+
+  const jsSummary = summarize(jsSamples);
+  const wasmSummary = summarize(wasmSamples);
+  log("");
+  log(
+    `WASM total avg is ${(jsSummary.avg / wasmSummary.avg).toFixed(2)}x the JS avg ` +
+      `(>1 means WASM faster on average); p99 ratio is ` +
+      `${(jsSummary.p99 / wasmSummary.p99).toFixed(2)}x.`,
+  );
+  if (webglSamples) {
+    const webglSummary = summarize(webglSamples);
+    log(
+      `WebGL total avg is ${(jsSummary.avg / webglSummary.avg).toFixed(2)}x the JS avg, ` +
+        `${(wasmSummary.avg / webglSummary.avg).toFixed(2)}x the WASM avg ` +
+        `(>1 means WebGL faster on average); p99 ratio vs. WASM is ` +
+        `${(wasmSummary.p99 / webglSummary.p99).toFixed(2)}x.`,
+    );
+  }
+  log("");
+  log(
+    "This is a single-machine, single-run-shape measurement, not a " +
+      "statistically rigorous suite -- treat any ratio here as \"what this " +
+      "browser/device showed on this run\", and re-run a few times " +
+      "(especially on the actual low-power target device) before drawing " +
+      "conclusions. See tools/benchmark-raycaster.mjs's own notes on the " +
+      "same caveat for JS vs. WASM.",
+  );
+
+  jsRaycaster.destroy();
+  wasmRaycaster.destroy();
+  webglRaycaster.destroy();
+}
+
+const output = document.getElementById("output");
+document.getElementById("run").addEventListener("click", async () => {
+  output.textContent = "";
+  const log = (line) => {
+    output.textContent += `${line}\n`;
+    output.scrollTop = output.scrollHeight;
+  };
+  try {
+    await run(log);
+    log("\nDone.");
+  } catch (error) {
+    log(`\nFAILED: ${error?.stack ?? error}`);
+  }
+});
+</script>
+</body>
+</html>

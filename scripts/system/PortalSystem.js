@@ -46,6 +46,8 @@ export class PortalSystem extends System {
 
     portalSubject.z = exitMovement.z;
 
+    this.renderer.resetCameraZ();
+
     portalSubject.angle = exitMovement.angle;
 
     this.particles.spawn({

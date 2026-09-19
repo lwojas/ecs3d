@@ -19,6 +19,7 @@
 // unless a name explicitly says "ray" (e.g. rayDistance, entryDistance).
 import { SoftwareRenderer } from "./SoftwareRenderer.js";
 import { WasmRenderer } from "./WasmRenderer.js";
+import { WebGLRenderer } from "./WebGLRenderer.js";
 
 export class Raycaster {
   // Distance fog's built-in fallback colour matches the flat sky colour
@@ -69,6 +70,14 @@ export class Raycaster {
     this.debugFrame = 0;
     this.debugStats = this.createDebugStats();
 
+    // The JS/WASM renderers both produce a CPU pixel buffer (`imageData`)
+    // that gets blitted into a Phaser BitmapData every frame via
+    // putImageData() -- see renderSnapshot() below. This canvas/imageData
+    // pair is still created unconditionally (including for the "webgl"
+    // renderer) because SoftwareRenderer -- always constructed as
+    // `this.fallback`/the non-rendering geometry-query implementation, see
+    // the renderer selection below -- expects a valid `imageData` in its
+    // state even though the WebGL path never actually reads or writes it.
     this.canvas = document.createElement("canvas");
     this.canvas.width = this.width;
     this.canvas.height = this.height;
@@ -77,8 +86,6 @@ export class Raycaster {
     this.imageData = this.ctx.createImageData(this.width, this.height);
 
     this.sprite = this.game.add.sprite(0, 0, null);
-    this.texture = this.game.add.bitmapData(this.width, this.height);
-    this.sprite.loadTexture(this.texture);
     this.sprite.smoothed = false;
 
     this.cells = {};
@@ -126,15 +133,65 @@ export class Raycaster {
       loadSpriteSurface: this.loadSpriteSurface.bind(this),
     };
     const softwareRenderer = new SoftwareRenderer(rendererState);
-    this.renderer =
-      options.renderer === "wasm"
-        ? new WasmRenderer(rendererState, softwareRenderer)
-        : softwareRenderer;
+    if (options.renderer === "wasm") {
+      this.renderer = new WasmRenderer(rendererState, softwareRenderer);
+    } else if (options.renderer === "webgl") {
+      this.renderer = new WebGLRenderer(rendererState, softwareRenderer);
+    } else {
+      this.renderer = softwareRenderer;
+    }
+    this.logRendererSelection(options.renderer);
     this.renderer.updateWorldFromState?.({
       level: this.level,
       map: this.map,
       cells: this.cells,
     });
+
+    // The WebGL renderer draws into its own <canvas>/gl context and must
+    // never go through putImageData() (see renderSnapshot() below) --
+    // reading pixels back from the GPU every frame just to hand them to a
+    // 2D canvas would be exactly the CPU<->GPU synchronisation stall this
+    // renderer exists to avoid. Instead its canvas becomes the sprite's
+    // texture directly: Phaser here runs in pure Canvas2D mode
+    // (Phaser.CANVAS, see scripts/init.js), so PIXI's CanvasRenderer draws
+    // a canvas-backed texture with a live context.drawImage(sourceCanvas,
+    // ...) every Phaser frame -- no dirty flag, no extra upload step, and
+    // it always reflects whatever this.renderer last drew.
+    if (this.renderer instanceof WebGLRenderer && this.renderer.ready) {
+      this.texture = null;
+      this.sprite.loadTexture(PIXI.Texture.fromCanvas(this.renderer.canvas));
+    } else {
+      this.texture = this.game.add.bitmapData(this.width, this.height);
+      this.sprite.loadTexture(this.texture);
+    }
+  }
+
+  // Both WasmRenderer and WebGLRenderer fail closed: if WASM fails to load,
+  // or WebGL2 context/shader setup throws, `ready` just stays false and
+  // renderSnapshot() silently falls back to the CPU SoftwareRenderer (see
+  // WebGLRenderer.renderSnapshot()/WasmRenderer's same ready/failed
+  // contract) -- nothing else ever surfaces that. This is the only place
+  // that reports which backend actually ended up active, so a requested
+  // "wasm"/"webgl" that silently never engaged is visible in the console
+  // instead of indistinguishable from "it's running and just looks the
+  // same". WasmRenderer's `initializing` is a promise (module load is
+  // async); WebGLRenderer has no such property, so it's checked already.
+  logRendererSelection(requested) {
+    if (requested !== "wasm" && requested !== "webgl") return;
+    const label = requested === "wasm" ? "WASM" : "WebGL";
+    const renderer = this.renderer;
+    const report = () => {
+      if (renderer.ready) {
+        console.info(`Raycaster: using ${label} renderer.`);
+      } else {
+        console.warn(
+          `Raycaster: ${label} renderer requested but unavailable, falling back to CPU (JS) rendering.`,
+          renderer.failed ?? "",
+        );
+      }
+    };
+    if (renderer.initializing) renderer.initializing.then(report);
+    else report();
   }
 
   normaliseMap(map) {
@@ -508,6 +565,31 @@ export class Raycaster {
     return this.isWall(x / this.cellSize, y / this.cellSize);
   }
 
+  // Height-aware blocking check for things that fly over/under a step
+  // instead of walking on it (projectiles, hitscan) -- unlike isWall(),
+  // which only ever looks at the coarse whole-cell `blocking` flag (and
+  // is therefore false for a walkable ledge/curb, see
+  // normaliseCellDefinition()), this checks the actual per-section height
+  // range, the same way checkVisibility() already does for AI
+  // line-of-sight. A cell with sections blocks only where `z` falls
+  // inside one of them, so a bolt fired below a ledge's top is stopped by
+  // it while one fired above passes over -- a cell with no sections (an
+  // open floor tile, or an invisible blocker with no geometry) falls back
+  // to the whole-cell `blocking` flag.
+  isBlocked(x, y, z) {
+    const cell = this.getCell(x, y);
+    if (!cell) return false;
+    const sections = cell.sections ?? [];
+    if (sections.length) {
+      return sections.some((section) => z >= section.bottom && z <= section.top);
+    }
+    return !!cell.blocking;
+  }
+
+  isBlockedWorld(x, y, z) {
+    return this.isBlocked(x / this.cellSize, y / this.cellSize, z);
+  }
+
   // The inverse of the `x / this.cellSize` conversion used throughout this
   // file -- cell-space (possibly fractional, e.g. 7.5 for the middle of
   // cell 7) to world-space. Authored spawn points are stored in cell
@@ -775,8 +857,14 @@ export class Raycaster {
   renderSnapshot(camera) {
     const uploadStart = this.debug ? performance.now() : 0;
     const result = this.renderer.renderSnapshot(camera);
-    this.texture.context.putImageData(this.imageData, 0, 0);
-    this.texture.dirty = true;
+    // Only the JS/WASM path (a CPU pixel buffer) needs this upload step --
+    // the WebGL renderer draws straight into its own canvas, which is
+    // already the sprite's texture (see the constructor's renderer-
+    // selection block), so `this.texture` is null in that case.
+    if (this.texture) {
+      this.texture.context.putImageData(this.imageData, 0, 0);
+      this.texture.dirty = true;
+    }
     if (this.debug) {
       this.renderer.debugStats.uploadMs = performance.now() - uploadStart;
       this.renderer.debugStats.frameMs += this.renderer.debugStats.uploadMs;

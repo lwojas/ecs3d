@@ -198,7 +198,7 @@ export default class ItemRegistry {
     }
 
     const animation = this.equippedSprite.animations.getAnimation(stateId);
-
+    console.log("Hud should be firing", animation);
     if (!animation) {
       return false;
     }

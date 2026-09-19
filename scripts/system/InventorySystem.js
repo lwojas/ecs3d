@@ -62,6 +62,7 @@ export class InventorySystem extends System {
 
   syncHud(entity) {
     if (this.hud) {
+      // console.log("Syncing hud");
       const itemId = this.getInventory(entity).equipped;
       this.hud.equip(itemId);
       // Not every entity carries a ResourceComponent (e.g. bots don't

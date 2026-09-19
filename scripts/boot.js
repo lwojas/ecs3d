@@ -15,7 +15,7 @@ const STATE_BY_MODE = {
 };
 const DEFAULT_GAMEPLAY_STATE = "SinglePlayerWhiteroom";
 
-const LOCAL_MODE = false;
+const LOCAL_MODE = true;
 
 BasicGame.Boot = function (game) {};
 

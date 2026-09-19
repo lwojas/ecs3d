@@ -85,7 +85,7 @@ export class ProjectileSystem {
         const nextY = projectile.y + projectile.vy * delta;
         const nextZ = projectile.z + projectile.vz * delta;
 
-        if (this.raycaster.isWallWorld(nextX, nextY)) {
+        if (this.raycaster.isBlockedWorld(nextX, nextY, nextZ)) {
           projectile.active = false;
           continue;
         }

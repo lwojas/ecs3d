@@ -1253,6 +1253,45 @@ function testStepCollision() {
   assertNear(raycaster.getEyeHeightWorld(10, 6), raycaster.cameraHeight);
 }
 
+// A step/ledge is `blocking: false` so the player can walk on top of it
+// (see testStepCollision above), but its `sections` geometry should still
+// stop something flying through it at the section's height -- e.g. a
+// projectile fired below the ledge's top -- while letting anything above
+// it pass. isWall()/isWallWorld() (whole-cell, height-blind) can't express
+// this; isBlocked()/isBlockedWorld() must.
+function testHeightAwareBlocking() {
+  const cells = {
+    1: { floorHeight: 0, ceilingHeight: 8, wall: { textureKey: "wall" }, blocking: true },
+    2: { floorHeight: 0, ceilingHeight: 2.5, wall: null, blocking: false },
+    3: {
+      floorHeight: 0,
+      ceilingHeight: 0.5,
+      wall: { textureKey: "step" },
+      sections: [{ bottom: 0, top: 0.5, material: { textureKey: "step" } }],
+      blocking: false,
+    },
+  };
+  const raycaster = createSegmentFixture(["111", "132", "111"], cells);
+
+  // A full-height wall blocks at any height within its floor/ceiling span.
+  assert.equal(raycaster.isBlocked(0, 1, 0), true);
+  assert.equal(raycaster.isBlocked(0, 1, 4), true);
+  assert.equal(raycaster.isBlockedWorld(2, 6, 0), true);
+
+  // The step/ledge: walkable (not blocking for movement), but its section
+  // geometry (0 -> 0.5) still stops something at that height...
+  assert.equal(raycaster.isWall(1, 1), false); // whole-cell check misses this bug
+  assert.equal(raycaster.isBlocked(1, 1, 0.25), true);
+  assert.equal(raycaster.isBlockedWorld(6, 6, 0.25), true);
+  // ...while something above the ledge's top passes freely over it.
+  assert.equal(raycaster.isBlocked(1, 1, 1), false);
+  assert.equal(raycaster.isBlockedWorld(6, 6, 4), false);
+
+  // An open cell (no sections at all) never blocks, at any height.
+  assert.equal(raycaster.isBlocked(2, 1, 0), false);
+  assert.equal(raycaster.isBlocked(2, 1, 5), false);
+}
+
 function createVisibilityFixture() {
   const wallMaterial = { textureKey: "wall" };
   // index: 0='1' boundary, 1='0' open, 2='1' interior full wall (same
@@ -1487,6 +1526,7 @@ const tests = [
   ["open-ceiling fixture", testOpenCeilingFixture],
   ["multi-cell corridor fixture", testMultiCellCorridorFixture],
   ["step collision", testStepCollision],
+  ["height-aware blocking", testHeightAwareBlocking],
   ["check visibility", testCheckVisibility],
   ["set cell blocking", testSetCellBlocking],
   ["set cell sections", testSetCellSections],

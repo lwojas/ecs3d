@@ -27,6 +27,7 @@ export class PickupSystem {
   collectInventoryItem(entity, pickup) {
     if (!this.inventorySystem) return;
     this.inventorySystem.add(entity, pickup.itemName);
+    if (pickup.useNow) this.inventorySystem.equip(entity, pickup.itemName);
     if (!entity.hasComponent("HudComponent")) return;
     this.inventorySystem.syncHud(entity);
     // console.log(this.inventorySystem);

@@ -46,7 +46,6 @@ export async function loadAssets(game) {
           location,
           asset.frameWidth,
           asset.frameHeight,
-          true,
         );
         break;
 
