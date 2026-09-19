@@ -58,7 +58,7 @@ function createDefaultRaycaster(game, mapData) {
     cameraHeight: 4,
     fov: Math.PI / 3,
     maxDistance: 1000,
-    renderer: "webgl",
+    // renderer: "webgl",
     debug: false,
     debugSpriteAnchors: false,
   });
@@ -349,7 +349,7 @@ export class MapWorld {
     this.eventRouter.registerInventory(this.inventorySystem);
 
     this.hud.bringToTop();
-    this.hud.notify("Welcome to hell!");
+    this.hud.notify("Game start!");
 
     this.pickupSystem = new PickupSystem(
       this.inventorySystem,

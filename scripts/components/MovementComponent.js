@@ -22,7 +22,7 @@ export class MovementComponent {
     this.angle = data.angle || 0;
     this.viewAngle = data.viewAngle || 0;
     this.mouseSensitivity = data.mouseSensitivity || 0.0025;
-    this.speed = data.speed || 8;
+    this.speed = data.speed || 20;
     this.moveX = 0;
     this.moveY = 0;
     this.movable = data.movable ?? true;
