@@ -3,5 +3,5 @@
 // Add a resource type here and it shows up as a loadout field for every
 // player row with zero further GameMenu.js changes.
 export const resourceData = {
-  plasma: { label: "Plasma", step: 10 },
+  plasma: { label: "Plasma", step: 10, total: 250 },
 };

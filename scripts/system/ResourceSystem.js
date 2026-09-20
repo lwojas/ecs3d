@@ -1,5 +1,6 @@
 import { resolveComponentList } from "../tools/componentResolver.js";
 import { System } from "./System.js";
+import { resourceData } from "./resourceData.js";
 
 export class ResourceSystem extends System {
   constructor() {
@@ -18,10 +19,28 @@ export class ResourceSystem extends System {
   }
 }
 
+function checkIfFull(amount1, resourceType) {
+  if (amount1 >= resourceData[resourceType].total) {
+    return true;
+  }
+  return false;
+}
+
 export function addResource(pickupComponent, resourceComponent) {
   if (!resourceComponent) return;
-  resourceComponent.resources[pickupComponent.itemName] +=
-    pickupComponent.amount;
+  const itemName = pickupComponent.itemName;
+  const resources = resourceComponent.resources;
+  // console.log(pickupComponent, resourceComponent);
+  const amount = pickupComponent.amount;
+  const resourceAmount = resources[itemName];
+  if (!resourceAmount) return;
+  if (checkIfFull(resourceAmount, itemName)) return true;
+
+  resources[itemName] = Math.min(
+    amount + resources[itemName],
+    resourceData[itemName].total,
+  );
+  return false;
 }
 
 export function checkResource(resourceName, entity) {

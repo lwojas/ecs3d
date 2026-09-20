@@ -8,6 +8,7 @@ export const itemData = {
     fireMode: "single",
     fireRate: 0.5,
     consumes: 5,
+    speedMultiplier: 2,
     // origin: "camera",
   },
   shotgun: {
@@ -19,6 +20,7 @@ export const itemData = {
     fireMode: "single",
     fireRate: 0.1,
     consumes: 2,
+    speedMultiplier: 4,
     // origin: "camera",
   },
 };

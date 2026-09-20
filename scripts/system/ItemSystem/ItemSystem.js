@@ -45,7 +45,7 @@ export class ItemSystem extends System {
       if (boundTarget.entity.hasComponent("ResourceComponent")) {
         const resourceName = item.projectile;
         const resources = checkResource(resourceName, boundTarget.entity);
-        console.log(resources);
+        // console.log(resources);
         if (!resources) return;
         resources[resourceName] -= item.consumes;
         if (hasHud) this.hud.setAmmo(resources[resourceName], 0);
@@ -105,8 +105,13 @@ export class ItemSystem extends System {
   //   }
 
   fireFromCamera(item, boundTarget, offset = {}) {
+    const projectile = item.projectile;
     const distance = 2;
-    const speed = 50;
+    const projectileData = this.projectileSystem.getProjectileData(projectile);
+
+    // console.log(projectileData);
+    const speed = projectileData.speed * item.speedMultiplier;
+    // console.log(item);
 
     const { right = 0, forward = 0, up = 0 } = offset;
 
@@ -154,7 +159,7 @@ export class ItemSystem extends System {
       upZ * up;
 
     this.projectileSystem.fire(
-      item.projectile,
+      projectile,
       x,
       y,
       z,

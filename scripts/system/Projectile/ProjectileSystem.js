@@ -21,6 +21,10 @@ export class ProjectileSystem {
     return new Projectile(type, data);
   }
 
+  getProjectileData(type) {
+    return projectileData[type];
+  }
+
   getProjectile(type) {
     let pool = this.pools[type];
 

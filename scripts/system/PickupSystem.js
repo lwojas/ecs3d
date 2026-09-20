@@ -1,4 +1,5 @@
 import { addResource } from "./ResourceSystem.js";
+import { timerDelay } from "../services/TimerService.js";
 
 export class PickupSystem {
   constructor(inventorySystem, audioSystem, hud) {
@@ -10,7 +11,7 @@ export class PickupSystem {
   collectPickup(data) {
     const pickup = data.trigger.getComponent("PickupComponent");
     const resourceComponent = data.activator.getComponent("ResourceComponent");
-    console.log(pickup);
+    // console.log(pickup);
 
     switch (pickup.category) {
       case "ammo":
@@ -39,14 +40,21 @@ export class PickupSystem {
 
   collectResource(pickup, resourceComponent, data) {
     if (!resourceComponent) return;
-    addResource(pickup, resourceComponent);
+    const isFull = addResource(pickup, resourceComponent);
+    if (isFull) return;
     if (!this.inventorySystem || !data.activator.hasComponent("HudComponent"))
       return;
     this.inventorySystem.syncHud(data.activator);
-    this.hud.notify(`+ ${pickup.amount} ${pickup.type}`, 600);
+    this.hud.notify(`Received ${pickup.itemName}`, 600);
     if (this.audioSystem) {
       this.audioSystem.play("pickup");
     }
+    pickup.entity.disable();
+    if (pickup.once) return;
+    timerDelay(pickup.respawnTime, () => {
+      pickup.entity.enable();
+    });
+
     // console.log(data);
   }
 }

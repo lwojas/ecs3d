@@ -7,7 +7,7 @@ export const projectileData = {
     damage: 10,
     staggerPower: 6,
     knockback: 2,
-    speed: 30,
+    speed: 50,
     lifetime: 2,
     collisionRadius: 2,
     collisionHeight: 2,
