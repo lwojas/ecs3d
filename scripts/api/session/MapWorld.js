@@ -58,7 +58,7 @@ function createDefaultRaycaster(game, mapData) {
     cameraHeight: 4,
     fov: Math.PI / 3,
     maxDistance: 1000,
-    // renderer: "webgl",
+    renderer: "webgl",
     debug: false,
     debugSpriteAnchors: false,
   });
