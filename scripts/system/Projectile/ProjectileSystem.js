@@ -87,6 +87,7 @@ export class ProjectileSystem {
 
         if (this.raycaster.isBlockedWorld(nextX, nextY, nextZ)) {
           projectile.active = false;
+          // console.log("Destroying projectile");
           continue;
         }
 

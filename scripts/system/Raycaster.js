@@ -579,6 +579,7 @@ export class Raycaster {
   isBlocked(x, y, z) {
     const cell = this.getCell(x, y);
     if (!cell) return false;
+    if (z < cell.floorHeight || z > cell.ceilingHeight) return true;
     const sections = cell.sections ?? [];
     if (sections.length) {
       return sections.some((section) => z >= section.bottom && z <= section.top);
