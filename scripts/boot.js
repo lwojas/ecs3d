@@ -15,7 +15,7 @@ const STATE_BY_MODE = {
 };
 const DEFAULT_GAMEPLAY_STATE = "SinglePlayerWhiteroom";
 
-const LOCAL_MODE = true;
+const LOCAL_MODE = false;
 
 BasicGame.Boot = function (game) {};
 
@@ -53,6 +53,8 @@ BasicGame.Boot.prototype = {
       this.load.image("enemy1_attack1", "assets/npc/cobraatt1.png");
       this.load.image("enemy1_attack2", "assets/npc/cobraatt2.png");
       this.load.image("portalParticle", "assets/particles/portalParticle.png");
+      this.load.image("cross", "assets/hud/cross.png");
+      this.loc;
       // Audio
       this.load.audio("sfx_pickup", "assets/audio/gui/positive.wav");
       this.load.spritesheet(

@@ -19,6 +19,12 @@ export default class PersistentHUD {
       font: "16px monospace",
     });
 
+    this.crossHair = game.add.sprite(100, 100, "cross");
+    this.crossHair.scale.setTo(1, 1);
+    // this.group.add(this.crossHair);
+    this.crossHair.x = game.camera.width / 2;
+    this.crossHair.y = game.camera.height / 2;
+
     // const newPadding = new Phaser.Point(32, 8);
 
     // this.healthText.padding.setTo(64, 16);

@@ -32,10 +32,12 @@ export class InputController {
     this.keys = this.game.input.keyboard.addKeys({
       forward: Phaser.Keyboard.W,
       backward: Phaser.Keyboard.S,
-      left: Phaser.Keyboard.A,
-      right: Phaser.Keyboard.D,
+      left: Phaser.Keyboard.LEFT,
+      right: Phaser.Keyboard.RIGHT,
       up: Phaser.Keyboard.UP,
       down: Phaser.Keyboard.DOWN,
+      aKey: Phaser.Keyboard.A,
+      dKey: Phaser.Keyboard.D,
     });
   }
 
@@ -93,14 +95,6 @@ export class InputController {
 
     if (!target) return;
 
-    // if (this.keys.left.isDown) {
-    //   target.angle -= 2.5 * dt;
-    // }
-
-    // if (this.keys.right.isDown) {
-    //   target.angle += 2.5 * dt;
-    // }
-
     // if (this.keys.lookUp.isDown) {
     //   target.viewAngle += 128 * dt;
     // }
@@ -112,17 +106,29 @@ export class InputController {
     let moveX = 0;
     let moveY = 0;
 
-    if (this.keys.forward.isDown || this.keys.up.isDown) {
-      moveX += Math.cos(target.angle);
+    const keys = this.keys;
 
+    if (keys.right.isDown || keys.dKey.isDown) {
+      moveX -= Math.sin(target.angle);
+      moveY += Math.cos(target.angle);
+      isMoving = true;
+    }
+
+    if (keys.left.isDown || keys.aKey.isDown) {
+      moveX += Math.sin(target.angle);
+      moveY -= Math.cos(target.angle);
+      isMoving = true;
+    }
+
+    if (keys.forward.isDown || keys.up.isDown) {
+      moveX += Math.cos(target.angle);
       moveY += Math.sin(target.angle);
       // this.sendMovementUpdate(target, true);
       isMoving = true;
     }
 
-    if (this.keys.backward.isDown || this.keys.down.isDown) {
+    if (keys.backward.isDown || keys.down.isDown) {
       moveX -= Math.cos(target.angle);
-
       moveY -= Math.sin(target.angle);
       isMoving = true;
       // this.sendMovementUpdate(target, true);
