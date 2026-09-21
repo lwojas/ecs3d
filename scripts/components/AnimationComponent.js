@@ -1,12 +1,13 @@
 export class AnimationComponent {
   static editor = {
     fields: {
-      animation: { type: "string" },
+      animations: { type: "object" },
     },
   };
   constructor(entity, data = {}) {
     this.entity = entity;
     this.enabled = true;
+    this.animations = data.animations ?? {};
     this.animation = data.animation ?? null;
     this.frame = 0;
     this.elapsed = 0;

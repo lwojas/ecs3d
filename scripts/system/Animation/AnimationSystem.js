@@ -1,6 +1,6 @@
 import { resolveComponentList } from "../../tools/componentResolver.js";
 import { System } from "../System.js";
-import { SPRITE_ANIMATIONS } from "./spriteAnimations.js";
+import { ANIMATION_DEFINITIONS } from "./spriteAnimations.js";
 
 export class AnimationSystem extends System {
   constructor() {
@@ -23,14 +23,38 @@ export class AnimationSystem extends System {
     this.spriteList = resolveComponentList("SpriteComponent", this.entities);
   }
 
+  // play(entity, animationKey) {
+  //   const definition = SPRITE_ANIMATIONS[animationKey];
+
+  //   if (!definition) {
+  //     console.warn(`Unknown sprite animation: ${animationKey}`);
+  //     return;
+  //   }
+  //   const animation = entity.getComponent("AnimationComponent");
+  //   if (animation.animation === animationKey) {
+  //     return;
+  //   }
+
+  //   animation.animation = animationKey;
+  //   animation.frame = 0;
+  //   animation.elapsed = 0;
+  //   animation.playing = true;
+  // }
+
   play(entity, animationKey) {
-    const definition = SPRITE_ANIMATIONS[animationKey];
+    const animation = entity.getComponent("AnimationComponent");
+    const definition = ANIMATION_DEFINITIONS[animationKey];
 
     if (!definition) {
-      console.warn(`Unknown sprite animation: ${animationKey}`);
+      console.warn(`Unknown animation: ${animationKey}`);
       return;
     }
-    const animation = entity.getComponent("AnimationComponent");
+
+    if (!animation.animations[animationKey]) {
+      console.warn(`Animation "${animationKey}" is not configured for entity`);
+      return;
+    }
+
     if (animation.animation === animationKey) {
       return;
     }
@@ -56,9 +80,10 @@ export class AnimationSystem extends System {
         continue;
       }
 
-      const definition = SPRITE_ANIMATIONS[animation.animation];
+      const definition = ANIMATION_DEFINITIONS[animation.animation];
+      const instance = animation.animations[animation.animation];
 
-      if (!definition || !definition.frames.length) {
+      if (!definition || !instance?.frames?.length) {
         continue;
       }
 
@@ -80,7 +105,7 @@ export class AnimationSystem extends System {
         }
       }
 
-      sprite.texture = definition.frames[animation.frame];
+      sprite.texture = instance.frames[animation.frame];
     }
   }
 }
