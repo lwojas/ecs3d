@@ -1,5 +1,4 @@
 import { Raycaster } from "../../system/Raycaster.js";
-import componentDefaults from "../../data/templates/componentDefaults.js";
 import { EntityManager } from "../../services/EntityManager.js";
 import { PrefabFactory } from "../../services/PrefabFactory.js";
 import { EntitySpawner } from "../../services/EntitySpawner.js";
@@ -29,6 +28,7 @@ import { TriggerSystem } from "../../system/TriggerSystem.js";
 import {
   resolveMapData,
   resolveEntityData,
+  resolveTemplateData,
   resolveSessionPlayers,
 } from "./sessions.js";
 import { componentClasses } from "../../services/ComponentClasses.js";
@@ -103,6 +103,11 @@ export class MapWorld {
     const entityData = session.entities
       ? await resolveEntityData(session.entities)
       : [];
+    // The one shared template document ("shared") unless a session
+    // explicitly names another -- see resolveTemplateData().
+    const componentDefaults = await resolveTemplateData(
+      session.templates ?? "shared",
+    );
 
     this.eventSystemGame = new EventBus("game");
     this.eventRouter = new EventRouter(this.eventSystemGame);

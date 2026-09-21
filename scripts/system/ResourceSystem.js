@@ -33,7 +33,7 @@ export function addResource(pickupComponent, resourceComponent) {
   // console.log(pickupComponent, resourceComponent);
   const amount = pickupComponent.amount;
   const resourceAmount = resources[itemName];
-  if (!resourceAmount) return;
+  if (!resources.hasOwnProperty(itemName)) return;
   if (checkIfFull(resourceAmount, itemName)) return true;
 
   resources[itemName] = Math.min(

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { GameplaySession } from "../scripts/api/session/GameplaySession.js";
 import { MapWorld } from "../scripts/api/session/MapWorld.js";
+import componentDefaults from "../scripts/data/templates/componentDefaults.js";
 
 // Demonstrates the lifecycle boundary this refactor exists to establish:
 // GameplaySession (Gameplay/Rules/Users) is created once and survives a
@@ -33,6 +34,9 @@ function makeSessionConfig() {
     gameMode: "singleplayer",
     map: minimalMapData,
     entities: [],
+    // Plain object -> resolveTemplateData() uses it straight away, no
+    // content-server fetch (same contract as map/entities above).
+    templates: componentDefaults,
     players: [
       {
         id: "player-1",

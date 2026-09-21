@@ -3,6 +3,7 @@ import { GameplaySession } from "../scripts/api/session/GameplaySession.js";
 import { MapWorld } from "../scripts/api/session/MapWorld.js";
 import testMap from "../scripts/data/maps/testMap.js";
 import testEntities from "../scripts/data/entities/testEntities.js";
+import componentDefaults from "../scripts/data/templates/componentDefaults.js";
 import {
   singlePlayerSession,
   coopSession,
@@ -35,6 +36,10 @@ async function buildSession(sessionConfig) {
       sessionConfig.entities === "testEntities"
         ? testEntities
         : sessionConfig.entities,
+    // MapWorld.buildWorld() resolves this the same way as map/entities --
+    // a plain object (as opposed to a string key) is used straight away,
+    // no content-server fetch, which is what a fixture needs offline.
+    templates: sessionConfig.templates ?? componentDefaults,
   };
   const gameplaySession = new GameplaySession(fixtureConfig);
   const world = new MapWorld(gameplaySession, {
@@ -215,6 +220,47 @@ async function testBotsWithNoStateDoNotCrashAndGetNoResourceComponent() {
   assert.equal(bot.getComponent("ResourceComponent"), undefined);
 }
 
+async function testSharedComponentDefaultsFlowFromTemplatesIntoTheEntity() {
+  // Regression: buildWorld() must resolve componentDefaults via
+  // resolveTemplateData() (the content server's "templates" document --
+  // see sessions.js), not a bundled/stale snapshot. Whatever a template
+  // says a component's shared/default data is -- AnimationComponent's
+  // frame data included -- has to reach the constructed component
+  // untouched, the same way any other component's defaults already do.
+  const templatesWithAnimationFrames = {
+    ...componentDefaults,
+    enemy: {
+      ...componentDefaults.enemy,
+      AnimationComponent: {
+        animations: {
+          idle: { frames: ["idle1", "idle2"] },
+        },
+      },
+    },
+  };
+
+  const session = await buildSession({
+    gameMode: "singleplayer",
+    map: "testMap",
+    entities: [],
+    players: [{ id: "player-1" }],
+    templates: templatesWithAnimationFrames,
+  });
+
+  const enemy = session.spawner.spawn({
+    prefab: "enemy",
+    uniqueId: "enemy-anim-regression",
+  });
+
+  const animation = enemy.getComponent("AnimationComponent");
+  assert.ok(animation, "enemy prefab should get an AnimationComponent");
+  assert.deepEqual(
+    animation.animations,
+    { idle: { frames: ["idle1", "idle2"] } },
+    "the template's AnimationComponent default data must reach the component instance",
+  );
+}
+
 const tests = [
   [
     "singlePlayerSession resolves the authored player entity, no dynamic spawn",
@@ -255,6 +301,10 @@ const tests = [
   [
     "bots with no state don't crash and get no ResourceComponent",
     testBotsWithNoStateDoNotCrashAndGetNoResourceComponent,
+  ],
+  [
+    "shared component defaults flow from the resolved templates document into the entity",
+    testSharedComponentDefaultsFlowFromTemplatesIntoTheEntity,
   ],
 ];
 

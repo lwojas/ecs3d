@@ -6,6 +6,7 @@ export class PrefabFactory {
   constructor(entityManager, componentDefaults) {
     this.entityManager = entityManager;
     this.componentDefaults = componentDefaults;
+    console.log(componentDefaults);
   }
 
   // Exposed so EntitySpawner can apply session modifiers against the

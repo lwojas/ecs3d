@@ -114,7 +114,9 @@ export class WaveRules extends GameRules {
   }
 
   onEnemyKilled(gameplay, enemy, killer) {
-    this.activeEnemies = this.activeEnemies.filter((active) => active !== enemy);
+    this.activeEnemies = this.activeEnemies.filter(
+      (active) => active !== enemy,
+    );
 
     const player = killer && gameplay.getPlayer(killer.id);
     if (player) {
@@ -145,6 +147,7 @@ export class WaveRules extends GameRules {
   startWave(gameplay, index) {
     this.waveIndex = index;
     const wave = this.waves[index];
+    console.log(wave);
     if (!wave) return;
     this.spawnWave(wave);
   }

@@ -56,7 +56,9 @@ export class EntitySpawner {
 
     const resolvedType = type ?? prefab;
     const point =
-      spawnPoint ?? components.SpawnComponent?.point ?? this.pickZonePoint(spawnZone);
+      spawnPoint ??
+      components.SpawnComponent?.point ??
+      this.pickZonePoint(spawnZone);
 
     const resolvedComponents = { ...components };
 
@@ -81,6 +83,7 @@ export class EntitySpawner {
       ...this.prefabFactory.getDefaultComponents(resolvedType),
       ...resolvedComponents,
     };
+    // console.log(this.prefabFactory.getDefaultComponents(resolvedType));
     const finalComponents = applyModifiers(base, modifiers);
 
     return this.prefabFactory.createEntity({

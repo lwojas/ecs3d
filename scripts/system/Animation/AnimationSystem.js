@@ -45,13 +45,15 @@ export class AnimationSystem extends System {
     const animation = entity.getComponent("AnimationComponent");
     const definition = ANIMATION_DEFINITIONS[animationKey];
 
+    // console.log(animation.animations);
+
     if (!definition) {
       console.warn(`Unknown animation: ${animationKey}`);
       return;
     }
 
     if (!animation.animations[animationKey]) {
-      console.warn(`Animation "${animationKey}" is not configured for entity`);
+      // console.warn(`Animation "${animationKey}" is not configured for entity`);
       return;
     }
 
@@ -93,13 +95,12 @@ export class AnimationSystem extends System {
         animation.elapsed -= definition.frameDuration;
         animation.frame++;
 
-        if (animation.frame >= definition.frames.length) {
+        if (animation.frame >= instance.frames.length) {
           if (definition.loop) {
             animation.frame = 0;
           } else {
-            animation.frame = definition.frames.length - 1;
+            animation.frame = instance.frames.length - 1;
             animation.playing = false;
-
             break;
           }
         }

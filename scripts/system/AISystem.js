@@ -642,13 +642,13 @@ export class AISystem extends System {
 
     switch (ai.state) {
       case "attack":
-        this.animationSystem.play(ai.entity, "enemyAttack");
+        this.animationSystem.play(ai.entity, "attack");
         break;
       case "idle":
-        this.animationSystem.play(ai.entity, "enemyIdle");
+        this.animationSystem.play(ai.entity, "idle");
         break;
       default:
-        this.animationSystem.play(ai.entity, "enemyWalk");
+        this.animationSystem.play(ai.entity, "walk");
         break;
     }
   }

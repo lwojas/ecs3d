@@ -5,6 +5,7 @@ import { PrefabFactory } from "../scripts/services/PrefabFactory.js";
 import { InventorySystem } from "../scripts/system/InventorySystem.js";
 import { GameplaySession } from "../scripts/api/session/GameplaySession.js";
 import { MapWorld } from "../scripts/api/session/MapWorld.js";
+import componentDefaults from "../scripts/data/templates/componentDefaults.js";
 
 // --- InventorySystem, against a bare InventoryComponent -----------------
 
@@ -106,7 +107,13 @@ const minimalMapData = {
 };
 
 async function buildSession(session) {
-  const gameplaySession = new GameplaySession(session);
+  // Same offline-fixture contract as game-session.test.mjs -- a plain
+  // object is used straight away by resolveTemplateData(), no
+  // content-server fetch.
+  const gameplaySession = new GameplaySession({
+    templates: componentDefaults,
+    ...session,
+  });
   const world = new MapWorld(gameplaySession, {
     game: {},
     createRaycaster: fakeCreateRaycaster,

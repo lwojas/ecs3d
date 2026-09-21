@@ -26,6 +26,7 @@ function cached(key, loader) {
 function listDocuments(type) {
   return cached(`list:${type}`, async () => {
     const result = await fetchJson(`/projects/${PROJECT_NAME}/${type}`);
+    // console.log(result);
     return result.documents;
   });
 }
@@ -86,6 +87,18 @@ export function resolveMapData(nameOrData) {
 export function resolveEntityData(nameOrData) {
   if (typeof nameOrData !== "string") return nameOrData;
   return loadDocument("entities", nameOrData);
+}
+
+// Shared default/component data per entity type (what PrefabFactory calls
+// componentDefaults) -- the editor's "templates" document type (see
+// Docs/content_server_readme.md), stored on the content server as
+// templates/<name>.json. There's currently one such document, "shared".
+// Same string-key-or-already-resolved-data contract as resolveMapData/
+// resolveEntityData above, so tests can pass a plain object fixture
+// without hitting the network.
+export function resolveTemplateData(nameOrData = "shared") {
+  if (typeof nameOrData !== "string") return nameOrData;
+  return loadDocument("templates", nameOrData);
 }
 
 // The registered keys, for anything that needs to *list* what's
