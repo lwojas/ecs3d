@@ -2,11 +2,12 @@ import { resolveComponentList } from "../tools/componentResolver.js";
 import { System } from "./System.js";
 
 export class CombatSystem extends System {
-  constructor(ecs, hud, collisionEvents, bloodSplat) {
+  constructor(ecs, hud, collisionEvents, bloodSplat, gibfx) {
     super();
     this.collisionEvents = collisionEvents;
     this.messageQueue = ecs;
     this.bloodSplat = bloodSplat;
+    this.gibfx = gibfx;
     this.hud = hud;
 
     this.entities = this.entityManager.registerSystem(this, [
@@ -40,12 +41,22 @@ export class CombatSystem extends System {
     });
 
     if (previousHealth > 0 && health.current <= 0) {
+      this.gibfx.spawn({
+        x: source.x,
+        y: source.y,
+        z: source.z,
+      });
       this.messageQueue.emit({
         type: "entity.killed",
         target,
         source,
       });
     } else {
+      this.bloodSplat.spawn({
+        x: source.x,
+        y: source.y,
+        z: source.z + 1,
+      });
       // Reactions are a live-target-only concern -- a killing blow just
       // dies, it doesn't also flinch/stagger/knock back.
       this.applyHitReaction(target.entity, source);
@@ -155,11 +166,6 @@ export class CombatSystem extends System {
         const hit = this.applyDamage(event.target, event.source);
         // Needs decoupling from Prjectile
         if (hit && event.source.constructor.name === "Projectile") {
-          this.bloodSplat.spawn({
-            x: event.source.x,
-            y: event.source.y,
-            z: event.source.z,
-          });
           event.source.active = false;
         }
       }

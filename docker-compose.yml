@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8084:80"
+    restart: unless-stopped
 
   editor:
     build:
@@ -15,3 +16,4 @@ services:
         VITE_CONTENT_PROJECT: ${VITE_CONTENT_PROJECT:-raycaster}
     ports:
       - "5183:80"
+    restart: unless-stopped

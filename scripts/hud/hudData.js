@@ -57,6 +57,62 @@ export const hudItems = {
 
   shotgun: {
     type: "weapon",
+    key: "hud_shotgun",
+    frame: 0,
+
+    position: {
+      x: 1100,
+      y: 1150,
+    },
+
+    anchor: {
+      x: 0.5,
+      y: 1,
+    },
+
+    scale: {
+      x: 4,
+      y: 4,
+    },
+
+    bob: {
+      enabled: true,
+      amount: 30,
+      speed: 200,
+    },
+
+    sway: {
+      enabled: true,
+      amount: 20,
+      sensitivity: 0.4,
+      returnSpeed: 8,
+    },
+
+    defaultState: "idle",
+
+    states: {
+      idle: {
+        frames: [0],
+        speed: 1,
+        loop: false,
+      },
+
+      fire: {
+        frames: [1, 0, 2, 0],
+        speed: 12,
+        loop: false,
+      },
+
+      reload: {
+        frames: [0, 2, 0],
+        speed: 12,
+        loop: false,
+      },
+    },
+  },
+
+  rifle: {
+    type: "weapon",
     key: "hudDecoupler",
     frame: 0,
 

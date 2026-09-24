@@ -21,7 +21,7 @@ export class PortalSystem extends System {
     this.teleporterList.forEach((teleporter) => {
       this.teleportHash[teleporter.id] = teleporter;
     });
-    console.log(this.teleportHash);
+    // console.log(this.teleportHash);
   }
 
   beginTeleport(event) {

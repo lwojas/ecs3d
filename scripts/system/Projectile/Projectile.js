@@ -22,8 +22,6 @@ export class Projectile {
     this.texture = data.texture;
     this.isLightSource = data.lighting || false;
 
-    this.isLightSource = data.lighting;
-
     // Lighting
     if (this.isLightSource) {
       this.radius = 20;

@@ -8,14 +8,23 @@ export const audioData = [
   //     loop: false,
   //   },
 
-  //   {
-  //     name: "shotgun",
-  //     key: "sfx_shotgun",
-  //     volume: 0.9,
-  //     pool: true,
-  //     poolSize: 4,
-  //     loop: false,
-  //   },
+  {
+    name: "shotgun",
+    key: "shotgunAudio",
+    volume: 0.5,
+    pool: true,
+    poolSize: 4,
+    loop: false,
+  },
+
+  {
+    name: "minigun",
+    key: "minigunAudio",
+    volume: 0.9,
+    pool: true,
+    poolSize: 4,
+    loop: false,
+  },
 
   //   {
   //     name: "plasma",

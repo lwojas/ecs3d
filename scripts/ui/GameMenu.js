@@ -14,7 +14,7 @@ import { resourceData } from "../system/resourceData.js";
 const DEFAULT_LOADOUT = {
   items: ["pistol", "shotgun", "flamethrower"],
   equipped: "shotgun",
-  resources: { plasma: 150 },
+  resources: { plasma: 150, buckshot: 50 },
 };
 
 // Turns a registry key like "testMap" into a human label ("Test Map").
@@ -62,6 +62,7 @@ function loadoutItemsHtml(selectedItems) {
 // here automatically, the same way loadoutItemsHtml() picks up new
 // weapons from itemData without this file changing.
 function loadoutResourcesHtml(resources) {
+  // console.log(resources);
   return Object.entries(resourceData)
     .map(
       ([id, def]) => `

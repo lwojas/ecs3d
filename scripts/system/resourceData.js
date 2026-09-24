@@ -4,4 +4,5 @@
 // player row with zero further GameMenu.js changes.
 export const resourceData = {
   plasma: { label: "Plasma", step: 10, total: 250 },
+  buckshot: { label: "Buckshot", step: 10, total: 250 },
 };

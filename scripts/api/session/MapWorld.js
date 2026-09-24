@@ -183,7 +183,7 @@ export class MapWorld {
           ...sessionPlayer.modifiers,
           ...(isBot ? session.botModifiers : null),
         };
-        console.log(session);
+        // console.log(session);
         entity = this.spawner.spawn({
           prefab: "player",
           uniqueId: sessionPlayer.id,
@@ -228,6 +228,7 @@ export class MapWorld {
       )?.components?.ResourceComponent;
 
       const persistentResources = user?.state?.resources;
+      // console.log(persistentResources);
       if (!authoredResources && persistentResources) {
         const resources = { ...persistentResources };
         entity.addComponent(
@@ -311,6 +312,10 @@ export class MapWorld {
       this.cameraRenderer,
     );
     this.bloodSplat = new BloodSplat(this.particleSystem, { count: 12 });
+    this.gibfx = new BloodSplat(this.particleSystem, {
+      count: 16,
+      particleType: "deathGib",
+    });
     this.portalEffect = new PortalParticles(this.particleSystem, {
       count: 128,
     });
@@ -332,13 +337,19 @@ export class MapWorld {
       this.hud,
       this.collisionSystem.collisionEvents,
       this.bloodSplat,
+      this.gibfx,
     );
     this.lightSystem = new LightSystem(this.cameraRenderer);
     this.triggerSystem = new TriggerSystem(
       this.collisionSystem.collisionEvents,
       this.conditionalChecker,
     );
-    this.itemSystem = new ItemSystem(this.hud, this.projectileSystem);
+    this.itemSystem = new ItemSystem(
+      this.hud,
+      this.projectileSystem,
+      this.audio,
+      this.cameraRenderer,
+    );
     this.interactionSystem.setItemSystem(this.itemSystem);
     this.aiSystem = new AISystem(
       this.raycaster,

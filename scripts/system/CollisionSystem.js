@@ -9,7 +9,7 @@ export class CollisionSystem extends System {
 
     this.collisionEvents = [];
 
-    this.debug = false;
+    this.debug = true;
 
     this.entities = this.entityManager.registerSystem(this, [
       "MovementComponent",

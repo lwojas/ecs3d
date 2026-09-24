@@ -34,6 +34,10 @@ export class InteractionSystem {
     this.hud.items.setBob(isMoving);
   }
 
+  interactWithWorld() {
+    console.log("E key has been pressed");
+  }
+
   updateInteraction(action, boundTarget, userId) {
     if (this.state === "GAME_PLAY") {
       if (!this.itemSystem) return;

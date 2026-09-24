@@ -155,6 +155,7 @@ function createTestPlayerState() {
     },
     resources: {
       plasma: 150,
+      buckshot: 100,
     },
   };
 }

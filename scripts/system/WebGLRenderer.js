@@ -262,9 +262,10 @@ export class WebGLRenderer {
       // context.drawImage(this.canvas, ...) both run synchronously in the
       // same task, before the browser gets a chance to present/clear the
       // WebGL drawing buffer -- this is the standard "WebGL canvas
-      // composited through a 2D context" technique. Needs a real-browser
-      // check (see this repo's WebGL implementation plan) -- flip this on
-      // if the composited frame ever appears to lag or blank out.
+      // composited through a 2D context" technique. (Ruled out as the
+      // cause of the missing-muzzle-flash issue: flipping this to `true`
+      // made no difference -- see CameraRenderer's transient-light
+      // lifetime fix instead.)
       preserveDrawingBuffer: false,
     });
 
@@ -612,6 +613,7 @@ export class WebGLRenderer {
     this.fallback.updateProjection(camera);
 
     const ambient = camera.ambient ?? 1;
+
     const resolvedLights = this.fallback.resolveLights(camera.lights).slice(
       0,
       MAX_LIGHTS,

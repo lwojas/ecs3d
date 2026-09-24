@@ -12,6 +12,17 @@ export class CameraRenderer {
     this.lights = [];
     this.debugObjects = [];
 
+    // One-shot lights (e.g. muzzle flashes) that need to survive a couple
+    // of render ticks rather than exactly one: `this.lights` is rebuilt
+    // from scratch and truncated every update() call, so a light pushed
+    // straight onto it only ever gets included in the single render that
+    // happens to run before the next update() -- if that particular tick's
+    // render/composite gets skipped (Phaser can do this to catch up after
+    // a stall), the light is gone without ever having been seen. Tracking
+    // these separately, by remaining real time rather than tick count,
+    // means a skipped frame just means it's still around for the next one.
+    this.transientLights = [];
+
     this.ambient = 0.35;
 
     this.viewmodelLight = {
@@ -31,6 +42,13 @@ export class CameraRenderer {
 
   resetCameraZ() {
     this.renderZ = null;
+  }
+
+  // duration is real time (seconds), not a frame/tick count -- deliberately,
+  // so a render tick Phaser decides to skip doesn't cost the light its only
+  // chance to be seen (see this.transientLights' constructor comment).
+  addTransientLight(light, duration = 0.05) {
+    this.transientLights.push({ light, remaining: duration });
   }
 
   update(delta) {
@@ -69,11 +87,22 @@ export class CameraRenderer {
     input.z = this.renderZ;
     input.angle = target.angle;
 
+    for (let i = this.transientLights.length - 1; i >= 0; i--) {
+      const entry = this.transientLights[i];
+      entry.remaining -= delta;
+      if (entry.remaining <= 0) {
+        this.transientLights.splice(i, 1);
+      } else {
+        this.lights.push(entry.light);
+      }
+    }
+
     const camera = this.raycaster.createCameraSnapshot(input);
 
     camera.pitch = target.viewAngle;
     camera.sprites = this.sprites;
     camera.lights = this.lights;
+    // console.log(camera.lights);
     camera.debugObjects = this.debugObjects;
     camera.ambient = this.ambient;
 
@@ -91,6 +120,7 @@ export class CameraRenderer {
 
     this.sprites.length = 0;
     this.lights.length = 0;
+    // console.log(this.lights);
     this.debugObjects.length = 0;
   }
 }

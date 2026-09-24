@@ -99,7 +99,9 @@ export class ProjectileSystem {
         projectile.y = nextY;
         projectile.z = nextZ;
 
-        this.spriteRenderArray.push(projectile);
+        if (projectile.texture) {
+          this.spriteRenderArray.push(projectile);
+        }
         if (projectile.isLightSource) {
           this.lightRenderArray.push(projectile);
         }

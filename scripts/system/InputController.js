@@ -38,7 +38,14 @@ export class InputController {
       down: Phaser.Keyboard.DOWN,
       aKey: Phaser.Keyboard.A,
       dKey: Phaser.Keyboard.D,
+      eKey: Phaser.Keyboard.E,
     });
+
+    this.keys.eKey.onDown.add(this.worldInteraction, this);
+  }
+
+  worldInteraction() {
+    this.InteractionSystem.interactWithWorld();
   }
 
   sendInteraction(interaction) {

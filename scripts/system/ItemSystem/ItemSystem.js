@@ -5,10 +5,12 @@ import { System } from "../System.js";
 import { itemData } from "./itemData.js";
 
 export class ItemSystem extends System {
-  constructor(hud, projectileSystem) {
+  constructor(hud, projectileSystem, audio, renderer) {
     super();
     this.projectileSystem = projectileSystem;
+    this.audioSystem = audio;
     this.hud = hud;
+    this.renderer = renderer;
     this.itemData = itemData;
     this.reloadTime = 0;
   }
@@ -43,7 +45,7 @@ export class ItemSystem extends System {
 
     if (now >= itemComponent.nextFireTime) {
       if (boundTarget.entity.hasComponent("ResourceComponent")) {
-        const resourceName = item.projectile;
+        const resourceName = projectile;
         const resources = checkResource(resourceName, boundTarget.entity);
         // console.log(resources);
         if (!resources) return;
@@ -109,8 +111,13 @@ export class ItemSystem extends System {
     const distance = 2;
     const projectileData = this.projectileSystem.getProjectileData(projectile);
 
+    if (this.audioSystem) {
+      this.audioSystem.play(projectileData.projectileSound);
+    }
+
     // console.log(projectileData);
     const speed = projectileData.speed * item.speedMultiplier;
+
     // console.log(item);
 
     const { right = 0, forward = 0, up = 0 } = offset;
@@ -157,6 +164,22 @@ export class ItemSystem extends System {
       directionZ * (distance + forward) +
       rightZ * right +
       upZ * up;
+
+    if (item.lighting) {
+      const light = {
+        x,
+        y,
+        z,
+        enabled: true,
+        ...item.lighting,
+      };
+      // console.log("Muzzle flash should be firing");
+      // A short real-time duration rather than a raw one-shot push onto
+      // renderer.lights -- see CameraRenderer.addTransientLight()'s
+      // comment for why a single-tick-lifetime light can go unseen even
+      // though it rendered correctly (a skipped Phaser render tick).
+      this.renderer.addTransientLight(light);
+    }
 
     this.projectileSystem.fire(
       projectile,

@@ -13,7 +13,7 @@ export class TweenSystem extends System {
 
   refreshList() {
     this.tweenList = resolveComponentList("TweenComponent", this.entities);
-    console.log(this.tweenList);
+    // console.log(this.tweenList);
   }
 
   update(dt) {

@@ -16,6 +16,27 @@ export const projectileData = {
     radius: 1,
     intensity: 1.5,
     tint: { r: 10, g: 100, b: 255 },
+    projectileSound: "minigun",
+  },
+
+  buckshot: {
+    texture: null,
+    width: 1,
+    height: 1,
+    scale: 1,
+    damage: 20,
+    staggerPower: 20,
+    knockback: 20,
+    speed: 400,
+    lifetime: 0.1,
+    collisionRadius: 8,
+    collisionHeight: 12,
+    collisionOffsetZ: -2,
+    lighting: null,
+    radius: 1,
+    intensity: 1.5,
+    tint: { r: 255, g: 100, b: 255 },
+    projectileSound: "shotgun",
   },
 
   enemyBolt: {
@@ -31,6 +52,7 @@ export const projectileData = {
     collisionRadius: 8,
     collisionHeight: 8,
     collisionOffsetZ: 0,
+    projectileSound: "shotgun",
   },
 
   rocket: {
@@ -46,5 +68,6 @@ export const projectileData = {
     collisionRadius: 8,
     collisionHeight: 8,
     collisionOffsetZ: 0,
+    projectileSound: "shotgun",
   },
 };
