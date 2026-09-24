@@ -4,6 +4,7 @@ export class TriggerComponent {
       enabled: { type: "boolean" },
       once: { type: "boolean" },
       onEnter: { type: "array" },
+      onExit: { type: "array" },
       ignoredTypes: { type: "array" },
     },
   };
