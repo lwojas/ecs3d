@@ -1,3 +1,4 @@
+import { timerDelay } from "../services/TimerService.js";
 import { resolveComponentList } from "../tools/componentResolver.js";
 import { System } from "./System.js";
 
@@ -8,21 +9,56 @@ export class CellSystem extends System {
     this.entities = this.entityManager.registerSystem(this, ["CellComponent"]);
     this.cellComps = resolveComponentList("CellComponent", this.entities);
     this.cellComps.forEach((cell) => {
-      const cellData = this.raycaster.getCellById(cell.cellId);
-      //   console.log(cellData.sections);
-
+      const cellData = this.raycaster.getCellDefinition(cell.cellId);
+      const renderedCell = this.raycaster.getCellById(cell.cellId);
       cell.originalSections = cellData.sections;
-      cell.originalBlocking = cellData.blocking;
-      //   console.log(cell);
+      cell.originalBlocking = renderedCell.blocking;
+      console.log(cell);
     });
   }
 
-  removeSection(entity, index) {
+  mutateCell(data) {
+    // console.log(data.trigger);
+    this.removeSection(data.trigger);
+  }
+
+  removeSection(entity) {
     const cellComponent = entity.getComponent("CellComponent");
     if (!cellComponent) return;
-    const newSections = cellComponent.sections.map((section, idx) => {
-      if (idx !== index) return section;
+    const index = cellComponent.sectionIndex;
+
+    const newSections = [];
+    cellComponent.originalSections.forEach((section, idx) => {
+      if (idx !== index) newSections.push(section);
     });
-    this.raycaster.setCellSections(cellComponent.cellId);
+    console.log(newSections);
+    this.raycaster.setCellSections(cellComponent.cellId, newSections);
+    // const blocking = !cellComponent.originalBlocking;
+
+    // console.log(blocking);
+
+    if (cellComponent.mutateBlocking) {
+      this.raycaster.setCellBlocking(
+        cellComponent.cellId,
+        !cellComponent.originalBlocking,
+      );
+    }
+    timerDelay(cellComponent.timeout, () =>
+      this.restoreOriginalSection(entity),
+    );
+  }
+
+  restoreOriginalSection(entity) {
+    console.log(entity);
+    const cellComponent = entity.getComponent("CellComponent");
+    if (!cellComponent) return;
+    this.raycaster.setCellSections(
+      cellComponent.cellId,
+      cellComponent.originalSections,
+    );
+    this.raycaster.setCellBlocking(
+      cellComponent.cellId,
+      cellComponent.originalBlocking,
+    );
   }
 }

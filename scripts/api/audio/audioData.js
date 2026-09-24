@@ -11,7 +11,7 @@ export const audioData = [
   {
     name: "shotgun",
     key: "shotgunAudio",
-    volume: 0.5,
+    volume: 0.3,
     pool: true,
     poolSize: 4,
     loop: false,
@@ -20,7 +20,7 @@ export const audioData = [
   {
     name: "minigun",
     key: "minigunAudio",
-    volume: 0.9,
+    volume: 0.4,
     pool: true,
     poolSize: 4,
     loop: false,

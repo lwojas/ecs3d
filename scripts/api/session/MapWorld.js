@@ -263,6 +263,7 @@ export class MapWorld {
     this.inventorySystem.registerHud(this.hud);
     this.conditionalChecker = new ConditionalChecker(this.inventorySystem);
     this.cellSystem = new CellSystem(this.raycaster);
+    this.eventRouter.registerCellSystem(this.cellSystem);
     this.humanPlayers = [];
     this.animationSystem = new AnimationSystem();
     this.gameplayManager.players.forEach((user) => {
@@ -375,7 +376,7 @@ export class MapWorld {
     this.eventRouter.registerPickupSystem(this.pickupSystem);
 
     function bindTestDoor(raycaster) {
-      const doorId = "5";
+      const doorId = "4";
       let isOpen = false;
 
       const spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);

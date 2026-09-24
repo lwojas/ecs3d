@@ -53,16 +53,35 @@ export class MovementSystem extends System {
 
         const distance = target.speed * dt;
 
+        const radius = 2;
+
         const nextX = target.x + moveX * distance;
         const nextY = target.y + moveY * distance;
 
-        if (!this.raycaster.isWallWorld(nextX, target.y)) {
+        if (
+          !this.raycaster.isWallWorld(nextX + radius, target.y) &&
+          !this.raycaster.isWallWorld(nextX - radius, target.y)
+        ) {
           target.x = nextX;
         }
 
-        if (!this.raycaster.isWallWorld(target.x, nextY)) {
+        if (
+          !this.raycaster.isWallWorld(target.x, nextY + radius) &&
+          !this.raycaster.isWallWorld(target.x, nextY - radius)
+        ) {
           target.y = nextY;
         }
+
+        // const nextX = target.x + moveX * distance;
+        // const nextY = target.y + moveY * distance;
+
+        // if (!this.raycaster.isWallWorld(nextX, target.y, 3)) {
+        //   target.x = nextX;
+        // }
+
+        // if (!this.raycaster.isWallWorld(target.x, nextY, 3)) {
+        //   target.y = nextY;
+        // }
       }
       // console.log(target, target.movable);
       // if (!target.movable) continue;

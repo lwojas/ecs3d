@@ -26,10 +26,16 @@ export class EventRouter {
     this.audioSystem = null;
     this.pickupSystem = null;
     this.portalSystem = null;
+    this.cellSystem = null;
 
     this.eventBus.on("lights.set", (data) => this.handleLightsSet(data));
     this.eventBus.on("resource.add", (data) => this.consumePickup(data));
     this.eventBus.on("portal.activate", (data) => this.beginTeleport(data));
+    this.eventBus.on("cell.mutate", (data) => this.mutateCell(data));
+  }
+
+  registerCellSystem(system) {
+    this.cellSystem = system;
   }
 
   registerPortalSystem(system) {
@@ -65,6 +71,10 @@ export class EventRouter {
   handleLightsSet(data) {
     if (!this.lightingSystem) return;
     this.lightingSystem.setLights(data);
+  }
+
+  mutateCell(data) {
+    this.cellSystem.mutateCell(data);
   }
 
   consumePickup(data) {

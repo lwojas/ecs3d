@@ -82,6 +82,27 @@ export class TriggerSystem extends System {
         }
       }
 
+      for (const activator of previous) {
+        if (current.has(activator)) continue;
+
+        if (!activator) continue;
+
+        const condition = triggerEntity.getComponent("ConditionComponent");
+
+        if (
+          condition &&
+          !this.conditions.evaluate(condition, {
+            activator,
+            entity: triggerEntity,
+            trigger,
+          })
+        ) {
+          continue;
+        }
+
+        this.handleExit(trigger, triggerEntity, activator);
+      }
+
       // Swap reusable sets.
       trigger.activeEntities = current;
       trigger.currentEntities = previous;
@@ -110,6 +131,17 @@ export class TriggerSystem extends System {
 
   isEntity(candidate) {
     return !!candidate && typeof candidate.hasComponent === "function";
+  }
+
+  handleExit(trigger, triggerEntity, activator) {
+    for (const action of trigger.onExit) {
+      if (!action?.event) continue;
+
+      this.eventBus.emit(action.event, {
+        trigger: triggerEntity,
+        activator,
+      });
+    }
   }
 
   handleEnter(trigger, triggerEntity, activator) {

@@ -502,6 +502,10 @@ export class Raycaster {
     if (this.cells[id]) return this.cells[id];
   }
 
+  getCellDefinition(id) {
+    return this.level.cells[id];
+  }
+
   // Runtime cell mutation for gameplay-driven geometry/collision changes
   // (doors, switches). Both setters key by cell **id** (as it appears in
   // the map, e.g. "5"), not by an (x, y) position: every map tile that
@@ -565,6 +569,20 @@ export class Raycaster {
     return this.isWall(x / this.cellSize, y / this.cellSize);
   }
 
+  // isWallWorld(x, y, radius = 0) {
+  //   if (radius === 0) {
+  //     return this.isWall(x / this.cellSize, y / this.cellSize);
+  //   }
+
+  //   const r = radius / this.cellSize;
+
+  //   return (
+  //     this.isWall((x - radius) / this.cellSize, y / this.cellSize) ||
+  //     this.isWall((x + radius) / this.cellSize, y / this.cellSize) ||
+  //     this.isWall(x / this.cellSize, (y - radius) / this.cellSize) ||
+  //     this.isWall(x / this.cellSize, (y + radius) / this.cellSize)
+  //   );
+  // }
   // Height-aware blocking check for things that fly over/under a step
   // instead of walking on it (projectiles, hitscan) -- unlike isWall(),
   // which only ever looks at the coarse whole-cell `blocking` flag (and
@@ -582,7 +600,9 @@ export class Raycaster {
     if (z < cell.floorHeight || z > cell.ceilingHeight) return true;
     const sections = cell.sections ?? [];
     if (sections.length) {
-      return sections.some((section) => z >= section.bottom && z <= section.top);
+      return sections.some(
+        (section) => z >= section.bottom && z <= section.top,
+      );
     }
     return !!cell.blocking;
   }
