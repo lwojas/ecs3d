@@ -16,7 +16,7 @@ export class SinglePlayerRules extends GameRules {
 
   events = {
     "player.died": "onPlayerDied",
-    "entity.moving": "onPlayerDied",
+    // "entity.moving": "onPlayerDied",
     "entity.damaged": "onEntityDamaged",
   };
 
@@ -28,8 +28,9 @@ export class SinglePlayerRules extends GameRules {
     }
     const player = gameplay.getPlayer(entity.id);
     // if (player.)
-    // console.log(player);
+
     if (player && message.currentHealth <= 0) {
+      // console.log(player);
       gameplay.addAction({
         type: "player.respawn",
         playerId: player.id,

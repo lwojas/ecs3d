@@ -86,13 +86,13 @@ function testBuildGeometryBatchesRing() {
   // quads * 6 vertices/quad = 192.
   const wallVertices = batches.get(wall);
   assert.ok(wallVertices, "wall material batch missing");
-  assert.equal(wallVertices.length / 9, 192);
+  assert.equal(wallVertices.length / 10, 192);
 
   // One floor quad + one ceiling quad for the single open cell, sharing one
   // material object: 2 quads * 6 vertices = 12.
   const floorVertices = batches.get(floorAndCeiling);
   assert.ok(floorVertices, "floor/ceiling material batch missing");
-  assert.equal(floorVertices.length / 9, 12);
+  assert.equal(floorVertices.length / 10, 12);
 
   // Fog is baked per vertex from the CURRENT cell (the wall cells set fog,
   // the open cell doesn't) -- spot-check one wall vertex and one floor
@@ -126,7 +126,7 @@ function testBuildGeometryBatchesSectionCap() {
   const vertices = batches.get(material);
   assert.ok(vertices);
   // 4 side faces + 1 top cap = 5 quads * 6 vertices = 30.
-  assert.equal(vertices.length / 9, 30);
+  assert.equal(vertices.length / 10, 30);
   console.log("PASS buildGeometryBatches: sill section emits exactly one cap");
 }
 
@@ -179,6 +179,7 @@ function createMockGl() {
     useProgram: () => {},
     uniform1i: () => {},
     uniform1f: () => {},
+    uniform1iv: () => {},
     uniform3f: () => {},
     uniform4fv: () => {},
     uniformMatrix4fv: (_loc, transpose, data) => {

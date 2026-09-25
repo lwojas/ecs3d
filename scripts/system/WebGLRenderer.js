@@ -37,7 +37,7 @@
 // instead of a per-pixel formula.
 import { SoftwareRenderer } from "./SoftwareRenderer.js";
 
-const VERTEX_FLOATS = 9; // position(3) + uv(2) + fogDistance(1) + fogColor(3)
+const VERTEX_FLOATS = 10; // position(3) + uv(2) + fogDistance(1) + fogColor(3) + zoneId(1)
 const MAX_LIGHTS = 16;
 const NEAR_PLANE = 0.01;
 const ALPHA_DISCARD = 0.02;
@@ -47,6 +47,7 @@ layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec2 aUV;
 layout(location = 2) in float aFogDistance;
 layout(location = 3) in vec3 aFogColor;
+layout(location = 4) in float aZoneId;
 
 uniform mat4 uViewProj;
 
@@ -54,12 +55,14 @@ out vec2 vUV;
 out vec3 vWorldPos;
 out float vFogDistance;
 out vec3 vFogColor;
+flat out float vZoneId;
 
 void main() {
   vUV = aUV;
   vWorldPos = aPosition;
   vFogDistance = aFogDistance;
   vFogColor = aFogColor;
+  vZoneId = aZoneId;
   gl_Position = uViewProj * vec4(aPosition, 1.0);
 }
 `;
@@ -70,6 +73,17 @@ void main() {
 // gets true per-pixel lighting on every surface "for free", so there's no
 // reason to reproduce the CPU's coarser per-column approximation for walls --
 // see this repo's WebGL implementation plan).
+//
+// Geometric light culling: `zoneId` (per-vertex, `flat`-interpolated so it's
+// exact, never blended) identifies which connected open-air "zone" a surface
+// belongs to -- see computeZones() below. A light only ever contributes to a
+// fragment whose zoneId matches that light's OWN current zone (uLightZone,
+// uploaded per frame since lights move); the existing distance/radius falloff
+// still applies on top of that gate. This is what makes a light on one side
+// of a wall/floor boundary stop at that boundary instead of shining through
+// it purely because the fragment happens to be within `radius` in a straight
+// line -- see computeZones()'s header comment for why zone membership exactly
+// matches this engine's own solid/open geometry, not a heuristic.
 const LIGHTING_GLSL = `
 #define MAX_LIGHTS ${MAX_LIGHTS}
 uniform vec3 uCameraPos;
@@ -77,11 +91,18 @@ uniform float uAmbient;
 uniform int uLightCount;
 uniform vec4 uLightPosRadius[MAX_LIGHTS];
 uniform vec4 uLightIntensityTint[MAX_LIGHTS];
+uniform int uLightZone[MAX_LIGHTS];
 
-vec3 sampleLight(vec3 worldPos) {
+vec3 sampleLight(vec3 worldPos, float zoneIdFloat) {
   vec3 rgb = vec3(uAmbient);
+  int zoneId = int(zoneIdFloat + 0.5);
+  // A negative zone means this surface is not part of any open volume (an
+  // interior face the camera/lights can never actually reach -- see
+  // computeZones()) -- ambient-only, no light uniform can ever match it.
+  if (zoneId < 0) return rgb;
   for (int i = 0; i < MAX_LIGHTS; i++) {
     if (i >= uLightCount) break;
+    if (uLightZone[i] != zoneId) continue;
     vec3 lightPos = uLightPosRadius[i].xyz;
     float radius = uLightPosRadius[i].w;
     vec3 d = worldPos - lightPos;
@@ -109,6 +130,7 @@ in vec2 vUV;
 in vec3 vWorldPos;
 in float vFogDistance;
 in vec3 vFogColor;
+flat in float vZoneId;
 out vec4 outColor;
 
 uniform sampler2D uTexture;
@@ -116,7 +138,7 @@ ${LIGHTING_GLSL}
 
 void main() {
   vec4 texColor = texture(uTexture, vUV);
-  vec3 lit = texColor.rgb * sampleLight(vWorldPos);
+  vec3 lit = texColor.rgb * sampleLight(vWorldPos, vZoneId);
   lit = applyFog(lit, vWorldPos, vFogDistance, vFogColor);
   outColor = vec4(lit, 1.0);
 }
@@ -133,6 +155,7 @@ in vec2 vUV;
 in vec3 vWorldPos;
 in float vFogDistance;
 in vec3 vFogColor;
+flat in float vZoneId;
 out vec4 outColor;
 
 uniform sampler2D uTexture;
@@ -141,7 +164,7 @@ ${LIGHTING_GLSL}
 void main() {
   vec4 texColor = texture(uTexture, vUV);
   if (texColor.a < ${ALPHA_DISCARD}) discard;
-  vec3 lit = texColor.rgb * sampleLight(vWorldPos);
+  vec3 lit = texColor.rgb * sampleLight(vWorldPos, vZoneId);
   lit = applyFog(lit, vWorldPos, vFogDistance, vFogColor);
   outColor = vec4(lit, texColor.a);
 }
@@ -250,6 +273,18 @@ export class WebGLRenderer {
     this.textureCache = new Map();
     this.worldState = null;
     this.skyTexture = null;
+
+    // Reused every call to setLightUniforms() (twice a frame -- once for
+    // the geometry program, once for sprites) instead of allocating fresh
+    // MAX_LIGHTS-sized typed arrays each time -- see this class's other
+    // scratch buffers (segmentScratch/visibleIntervalScratch precedent on
+    // the CPU renderer side) for why: this is per-frame garbage that scales
+    // with MAX_LIGHTS regardless of how many lights are actually active.
+    this.lightUniformScratch = {
+      posRadius: new Float32Array(MAX_LIGHTS * 4),
+      intensityTint: new Float32Array(MAX_LIGHTS * 4),
+      zoneIds: new Int32Array(MAX_LIGHTS),
+    };
 
     this.canvas = document.createElement("canvas");
     this.canvas.width = this.width;
@@ -382,6 +417,8 @@ export class WebGLRenderer {
     gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 20);
     gl.enableVertexAttribArray(3);
     gl.vertexAttribPointer(3, 3, gl.FLOAT, false, stride, 24);
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 1, gl.FLOAT, false, stride, 36);
   }
 
   createShader(type, source) {
@@ -521,7 +558,14 @@ export class WebGLRenderer {
     const cells = this.cells;
     if (!level || !map || !cells) return;
 
-    const batchData = buildGeometryBatches(level, map, cells, this.cellSize);
+    // Zones only depend on level/cell geometry, exactly like the mesh
+    // itself, so they're recomputed on the same cadence as buildMeshes()
+    // (level load, cell mutation) rather than per frame -- see
+    // computeZones()'s header comment. Kept on the instance so per-frame
+    // light/sprite zone lookups (setLightUniforms, buildSpriteVertices)
+    // reuse this exact same static structure instead of re-deriving it.
+    this.zones = computeZones(level, map, cells, this.cellSize);
+    const batchData = buildGeometryBatches(level, map, cells, this.cellSize, this.zones);
 
     for (const [material, floatArray] of batchData) {
       const vao = gl.createVertexArray();
@@ -668,8 +712,18 @@ export class WebGLRenderer {
     gl.uniform1f(this.uniformLocation(programInfo, "uAmbient"), ambient);
     gl.uniform1i(this.uniformLocation(programInfo, "uLightCount"), lights.length);
     if (lights.length) {
-      const posRadius = new Float32Array(MAX_LIGHTS * 4);
-      const intensityTint = new Float32Array(MAX_LIGHTS * 4);
+      // Reused scratch buffers (see the constructor) -- only the first
+      // `lights.length` entries are ever written here, and the shader's
+      // own loop never reads past `uLightCount` (see LIGHTING_GLSL's
+      // `if (i >= uLightCount) break;`), so entries left over from a
+      // previous, larger `lights.length` are simply never observed; no
+      // need to clear them.
+      const { posRadius, intensityTint, zoneIds } = this.lightUniformScratch;
+      // Each light's own zone, looked up fresh every frame (lights move --
+      // see LightSystem -- so which zone a light currently occupies is a
+      // per-frame value, unlike the static per-vertex zoneId the mesh
+      // carries). Cheap: one cell+band lookup per light, not per triangle
+      // -- see computeZones().zoneAt().
       for (let i = 0; i < lights.length; i++) {
         const light = lights[i];
         posRadius[i * 4] = light.x;
@@ -680,6 +734,7 @@ export class WebGLRenderer {
         intensityTint[i * 4 + 1] = light.tintR;
         intensityTint[i * 4 + 2] = light.tintG;
         intensityTint[i * 4 + 3] = light.tintB;
+        zoneIds[i] = this.zones ? this.zones.zoneAt(light.x, light.y, light.z) : -1;
       }
       gl.uniform4fv(
         this.uniformLocation(programInfo, "uLightPosRadius[0]"),
@@ -688,6 +743,10 @@ export class WebGLRenderer {
       gl.uniform4fv(
         this.uniformLocation(programInfo, "uLightIntensityTint[0]"),
         intensityTint,
+      );
+      gl.uniform1iv(
+        this.uniformLocation(programInfo, "uLightZone[0]"),
+        zoneIds,
       );
     }
   }
@@ -794,6 +853,16 @@ export class WebGLRenderer {
     const rightX = sprite.x + axisX * halfWidth;
     const rightY = sprite.y + axisY * halfWidth;
 
+    // Sampled at the sprite's vertical center -- a billboard has no real
+    // per-pixel world depth of its own (same three-tier granularity
+    // reasoning raycaster-architecture.md applies to lighting/fog: resolved
+    // once per sprite, at its anchor), so one zone lookup for the whole
+    // quad is exactly as correct as this renderer's existing per-sprite fog
+    // lookup just above.
+    const zoneId = this.zones
+      ? this.zones.zoneAt(sprite.x, sprite.y, z + worldHeight / 2)
+      : -1;
+
     return this.spriteQuadFloats(
       leftX,
       leftY,
@@ -805,6 +874,7 @@ export class WebGLRenderer {
       fogR,
       fogG,
       fogB,
+      zoneId,
     );
   }
 
@@ -814,7 +884,7 @@ export class WebGLRenderer {
   // appears mirrored or vertically flipped once checked in-browser, swap
   // the corresponding u/v pair below -- purely cosmetic, no structural
   // effect on lighting/fog/depth.
-  spriteQuadFloats(leftX, leftY, rightX, rightY, bottom, top, fogDistance, fogR, fogG, fogB) {
+  spriteQuadFloats(leftX, leftY, rightX, rightY, bottom, top, fogDistance, fogR, fogG, fogB, zoneId) {
     const verts = [
       [leftX, leftY, bottom, 0, 1],
       [rightX, rightY, bottom, 1, 1],
@@ -834,6 +904,7 @@ export class WebGLRenderer {
       out[offset++] = fogR;
       out[offset++] = fogG;
       out[offset++] = fogB;
+      out[offset++] = zoneId;
     }
     return out;
   }
@@ -998,20 +1069,230 @@ function mat4Multiply(a, b) {
   return out;
 }
 
+// A tiny disjoint-set/union-find structure -- used by computeZones() below
+// to merge grid-adjacent open vertical bands into connected zones without
+// an explicit graph traversal.
+function createUnionFind(size) {
+  const parent = new Int32Array(Math.max(1, size));
+  for (let i = 0; i < parent.length; i++) parent[i] = i;
+  const find = (i) => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+  const union = (a, b) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootA] = rootB;
+  };
+  return { find, union };
+}
+
+// Small tolerance (world units) used both to decide whether two bands'
+// z-ranges genuinely overlap (a real open gap, not just touching) and to
+// nudge a height query a hair inside the band it's meant to land in,
+// away from an exact boundary value. Not a "magic constant" tuning the
+// lighting itself -- it only guards against float-equality flakiness at
+// a band edge; any small value well under a realistic section thickness
+// works identically.
+const ZONE_EPSILON = 1e-3;
+
+// Computes this level's lighting "zones": the WebGL-specific spatial
+// structure that makes correct, geometry-aware light culling possible (see
+// this file's header comment). This is deliberately CPU-side, static
+// preprocessing -- recomputed only when buildMeshes() runs (level load,
+// cell mutation), never per frame or per light, exploiting the fact that
+// the level is a uniform grid (see the WebGL renderer's design notes).
+//
+// The model: a cell's vertical span (floorHeight..ceilingHeight) is solid
+// wherever a `section` covers it and open everywhere else -- these open
+// z-ranges are its "bands". Crucially, in this engine a section blocks a
+// cell on ALL FOUR sides uniformly (buildGeometryBatches() below emits
+// that cell's wall faces on every edge, not one directional face per
+// section) -- so cell solidity at a given height is a per-cell property,
+// never a per-edge one. That means two grid-adjacent cells' bands are
+// genuinely, physically connected (light/sight can pass between them)
+// when their z-ranges overlap; nothing extra (a separate "is this edge
+// open" flag) is needed, because the engine has no such concept to begin
+// with. The connected components of "band <-> grid-adjacent overlapping
+// band" ARE the zones: maximal, mutually-visible open volumes. A solid
+// wall (a section spanning a whole cell's height) simply produces no band
+// there at all, so nothing on either side of it can ever union through
+// that cell -- which is exactly "a wall blocks light leaking through it".
+// A floor/ceiling boundary with no adjacent open gap behaves the same
+// way. A window (a section with open bands above/below it) unions only
+// at the height of its own gap, so light can pass through the gap
+// without the whole two rooms merging into one via unrelated height
+// ranges.
+//
+// A subtlety this needs to guard against: a cell with NO sections at all
+// (one band spanning its whole floorHeight..ceilingHeight -- an ordinary
+// tall open room) sitting directly next to a partitioned cell (a raised
+// ledge/walkway with a solid slab band and open bands above and below
+// it) would otherwise overlap BOTH of that neighbour's bands at once,
+// silently re-merging "under the ledge" and "on top of the ledge" back
+// into one zone through the open room beside them -- exactly the leak
+// this file exists to prevent, just arriving via a wide-open room instead
+// of a direct hole in the ledge itself. Guarding against this generally
+// (real 3D visibility around the ledge's exposed edge) would need real
+// per-surface visibility, not a cell-grid connectivity graph -- out of
+// scope here (see this file's header comment on avoiding per-triangle
+// visibility work). Requiring each connection to be a MUTUAL best
+// overlap (unionMutualBestMatches() below) is the cheap, still purely
+// static, grid-exploiting fix: a wide-open band's single best match
+// across a shared edge is whichever neighbour band it overlaps *most*,
+// so it can still legitimately join ONE band on each side it borders,
+// but never bridges two of a single neighbour's otherwise-unrelated
+// bands through itself, which is what actually caused the merge.
+//
+// Returns { zoneAt(worldX, worldY, worldZ), zoneAtCell(cx, cy, z) }: both
+// resolve to a small non-negative integer zone id, or -1 if the given
+// point isn't inside any open band (solid geometry, or outside the map) --
+// see LIGHTING_GLSL's sampleLight(), which treats -1 as "ambient only, no
+// light can ever match it".
+export function computeZones(level, map, cells, cellSize) {
+  const width = level.width;
+  const height = level.height;
+  const bandsGrid = new Array(height);
+  let nodeCount = 0;
+
+  for (let cy = 0; cy < height; cy++) {
+    const row = map[cy] ?? [];
+    const bandsRow = new Array(width);
+    bandsGrid[cy] = bandsRow;
+    for (let cx = 0; cx < width; cx++) {
+      const id = String(row[cx] ?? "1");
+      const cell = cells[id] ?? cells["0"];
+      const bands = [];
+      if (cell) {
+        const sections = (cell.sections ?? [])
+          .slice()
+          .sort((a, b) => a.bottom - b.bottom);
+        let cursor = cell.floorHeight;
+        for (const section of sections) {
+          if (section.bottom > cursor) {
+            bands.push({ bottom: cursor, top: section.bottom, node: nodeCount++ });
+          }
+          cursor = Math.max(cursor, section.top);
+        }
+        if (cell.ceilingHeight > cursor) {
+          bands.push({ bottom: cursor, top: cell.ceilingHeight, node: nodeCount++ });
+        }
+      }
+      bandsRow[cx] = bands;
+    }
+  }
+
+  const uf = createUnionFind(nodeCount);
+  // Real overlap length (world units) between two bands' z-ranges, or a
+  // non-positive value if they don't genuinely overlap (only touch, or
+  // don't reach at all) -- see ZONE_EPSILON.
+  const overlapAmount = (a, b) => Math.min(a.top, b.top) - Math.max(a.bottom, b.bottom);
+
+  // Unions each band in `bandsA` with its best-overlapping counterpart in
+  // `bandsB` ACROSS ONE SHARED EDGE, but only when that pairing is each
+  // other's best match (see this function's header comment above for
+  // why: this is what stops one wide-open band from bridging two of the
+  // other side's otherwise-separate bands). A 1-to-1 or 1-to-many-but-
+  // clearly-largest-overlap pairing (the common case: aligned sections,
+  // or a plain window gap) always satisfies this trivially.
+  const unionMutualBestMatches = (bandsA, bandsB) => {
+    for (const a of bandsA) {
+      let bestB = null;
+      let bestBAmount = ZONE_EPSILON;
+      for (const b of bandsB) {
+        const amount = overlapAmount(a, b);
+        if (amount > bestBAmount) {
+          bestBAmount = amount;
+          bestB = b;
+        }
+      }
+      if (!bestB) continue;
+      let bestA = null;
+      let bestAAmount = ZONE_EPSILON;
+      for (const candidate of bandsA) {
+        const amount = overlapAmount(candidate, bestB);
+        if (amount > bestAAmount) {
+          bestAAmount = amount;
+          bestA = candidate;
+        }
+      }
+      if (bestA === a) uf.union(a.node, bestB.node);
+    }
+  };
+
+  for (let cy = 0; cy < height; cy++) {
+    for (let cx = 0; cx < width; cx++) {
+      const bands = bandsGrid[cy][cx];
+      if (!bands.length) continue;
+      if (cx + 1 < width) unionMutualBestMatches(bands, bandsGrid[cy][cx + 1]);
+      if (cy + 1 < height) unionMutualBestMatches(bands, bandsGrid[cy + 1][cx]);
+    }
+  }
+
+  // Remap union-find roots to small, compact zero-based ids (purely
+  // cosmetic/debuggable -- correctness only needs "same root = same
+  // zone", but dense small ids keep the shader-side int comparisons and
+  // any future debug logging readable).
+  const rootToZone = new Map();
+  const zoneOfNode = (node) => {
+    const root = uf.find(node);
+    let zone = rootToZone.get(root);
+    if (zone === undefined) {
+      zone = rootToZone.size;
+      rootToZone.set(root, zone);
+    }
+    return zone;
+  };
+  for (let cy = 0; cy < height; cy++) {
+    for (let cx = 0; cx < width; cx++) {
+      for (const band of bandsGrid[cy][cx]) band.zone = zoneOfNode(band.node);
+    }
+  }
+
+  const bandAtCell = (cx, cy, z) => {
+    if (cx < 0 || cy < 0 || cx >= width || cy >= height) return null;
+    const bands = bandsGrid[cy][cx];
+    for (const band of bands) {
+      if (z >= band.bottom - ZONE_EPSILON && z <= band.top + ZONE_EPSILON) return band;
+    }
+    return null;
+  };
+
+  return {
+    zoneAtCell(cx, cy, z) {
+      const band = bandAtCell(Math.floor(cx), Math.floor(cy), z);
+      return band ? band.zone : -1;
+    },
+    zoneAt(worldX, worldY, worldZ) {
+      return this.zoneAtCell(worldX / cellSize, worldY / cellSize, worldZ);
+    },
+  };
+}
+
 // Pure geometry-building step, deliberately kept free of any `gl` calls so
 // it's directly unit-testable under Node (no WebGL context needed) -- see
 // tests/webgl-renderer-contract.test.mjs. Walks the level's cell grid the
 // same way WasmRenderer.updateWorldFromState() walks it for its packed
-// buffers, but emits vertex data (position/uv/fog -- see VERTEX_FLOATS)
-// grouped by material object identity instead of packing into native
-// records. One quad per wall-section face (+ section caps, matching
-// drawSectionCaps()'s neighbour logic) and one quad per cell floor/ceiling
-// -- see this file's header comment and this repo's WebGL implementation
-// plan for why this (a static mesh) rather than per-column CPU quads.
+// buffers, but emits vertex data (position/uv/fog/zoneId -- see
+// VERTEX_FLOATS) grouped by material object identity instead of packing
+// into native records. One quad per wall-section face (+ section caps,
+// matching drawSectionCaps()'s neighbour logic) and one quad per cell
+// floor/ceiling -- see this file's header comment and this repo's WebGL
+// implementation plan for why this (a static mesh) rather than per-column
+// CPU quads.
+//
+// `zones` (see computeZones() above) is optional so this stays a
+// drop-in-compatible pure function for any existing caller that only cares
+// about geometry (it's computed fresh internally if omitted); buildMeshes()
+// always passes its own precomputed zones to avoid doing that work twice.
 // Returns Map<material-or-surface-object, Float32Array>.
-export function buildGeometryBatches(level, map, cells, cellSize) {
+export function buildGeometryBatches(level, map, cells, cellSize, zones) {
+  const resolvedZones = zones ?? computeZones(level, map, cells, cellSize);
   const batchLists = new Map();
-  const emitQuad = (material, corners, uvs, fog) => {
+  const emitQuad = (material, corners, uvs, fog, zoneId) => {
     if (!material) return;
     let list = batchLists.get(material);
     if (!list) {
@@ -1028,11 +1309,11 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
     for (const index of [0, 1, 2, 0, 2, 3]) {
       const [x, y, z] = corners[index];
       const [u, v] = uvs[index];
-      list.push(x, y, z, u, v, fogDistance, fogR, fogG, fogB);
+      list.push(x, y, z, u, v, fogDistance, fogR, fogG, fogB, zoneId);
     }
   };
 
-  const floorCeilingQuad = (x0, y0, x1, y1, z, material, fog) => {
+  const floorCeilingQuad = (x0, y0, x1, y1, z, material, fog, zoneId) => {
     if (!material) return;
     const mw = material.width || cellSize;
     const mh = material.height || cellSize;
@@ -1051,6 +1332,7 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
         [x0 / mw, y1 / mh],
       ],
       fog,
+      zoneId,
     );
   };
 
@@ -1064,7 +1346,7 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
   // Faces perpendicular to X (east/west) use world Y for texture U --
   // matches drawWallSection() picking entryHitY when a ray crosses a
   // vertical (side === 0) grid line.
-  const wallFaceX = (xConst, y0, y1, zBottom, zTop, material, fog) => {
+  const wallFaceX = (xConst, y0, y1, zBottom, zTop, material, fog, zoneId) => {
     const mw = material.width || cellSize;
     const mh = material.height || cellSize;
     const vBottom = 0;
@@ -1084,12 +1366,13 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
         [y0 / mw, vTop],
       ],
       fog,
+      zoneId,
     );
   };
 
   // Faces perpendicular to Y (north/south) use world X for texture U --
   // matches drawWallSection() picking entryHitX for side === 1.
-  const wallFaceY = (yConst, x0, x1, zBottom, zTop, material, fog) => {
+  const wallFaceY = (yConst, x0, x1, zBottom, zTop, material, fog, zoneId) => {
     const mw = material.width || cellSize;
     const mh = material.height || cellSize;
     const vBottom = 0;
@@ -1109,6 +1392,7 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
         [x0 / mw, vTop],
       ],
       fog,
+      zoneId,
     );
   };
 
@@ -1124,10 +1408,15 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
       const y1 = y0 + cellSize;
 
       if (cell.floor) {
-        floorCeilingQuad(x0, y0, x1, y1, cell.floorHeight, cell.floor, cell.fog);
+        // The floor is the lower boundary of whichever band starts at
+        // floorHeight -- query a hair above it, into that band, rather
+        // than exactly at the boundary value.
+        const zoneId = resolvedZones.zoneAtCell(cx, cy, cell.floorHeight + ZONE_EPSILON * 4);
+        floorCeilingQuad(x0, y0, x1, y1, cell.floorHeight, cell.floor, cell.fog, zoneId);
       }
       if (cell.ceiling) {
-        floorCeilingQuad(x0, y0, x1, y1, cell.ceilingHeight, cell.ceiling, cell.fog);
+        const zoneId = resolvedZones.zoneAtCell(cx, cy, cell.ceilingHeight - ZONE_EPSILON * 4);
+        floorCeilingQuad(x0, y0, x1, y1, cell.ceilingHeight, cell.ceiling, cell.fog, zoneId);
       }
 
       const sections = cell.sections ?? [];
@@ -1138,29 +1427,50 @@ export function buildGeometryBatches(level, map, cells, cellSize) {
         if (top <= bottom) continue;
         const fog = cell.fog;
 
+        // A section's own vertical faces are only ever visible from
+        // OUTSIDE this cell (this cell is solid at [bottom, top], so no
+        // camera/light can be inside it at that height) -- so each face's
+        // zone is whichever neighbour cell it actually opens onto at this
+        // section's own height, not this cell's own (nonexistent, at this
+        // height) zone. Queried at the section's vertical midpoint, safely
+        // inside its range.
+        const midZ = (bottom + top) / 2;
+        const westZone = resolvedZones.zoneAtCell(cx - 1, cy, midZ);
+        const eastZone = resolvedZones.zoneAtCell(cx + 1, cy, midZ);
+        const northZone = resolvedZones.zoneAtCell(cx, cy - 1, midZ);
+        const southZone = resolvedZones.zoneAtCell(cx, cy + 1, midZ);
+
         // All four side faces are emitted unconditionally for every
         // section-bearing cell, even ones that border another equally
-        // solid neighbour (an interior face the camera can never reach).
-        // This is a deliberate, documented simplification -- reasoning
-        // about which faces are externally visible would need the same
-        // neighbour-gap interval logic subtractInterval()/
-        // drawSectionCaps() already do on the CPU side, and for the
-        // modest, mostly-single-cell-thick levels this engine uses the
-        // extra hidden triangles are a bounded, minor cost. See this
-        // repo's WebGL implementation plan.
-        wallFaceX(x0, y0, y1, bottom, top, material, fog);
-        wallFaceX(x1, y0, y1, bottom, top, material, fog);
-        wallFaceY(y0, x0, x1, bottom, top, material, fog);
-        wallFaceY(y1, x0, x1, bottom, top, material, fog);
+        // solid neighbour (an interior face the camera can never reach --
+        // such a face now simply resolves to zoneId -1, ambient-only, on
+        // whichever side(s) really are solid). This is a deliberate,
+        // documented simplification -- reasoning about which faces are
+        // externally visible would need the same neighbour-gap interval
+        // logic subtractInterval()/drawSectionCaps() already do on the
+        // CPU side, and for the modest, mostly-single-cell-thick levels
+        // this engine uses the extra hidden triangles are a bounded,
+        // minor cost. See this repo's WebGL implementation plan.
+        wallFaceX(x0, y0, y1, bottom, top, material, fog, westZone);
+        wallFaceX(x1, y0, y1, bottom, top, material, fog, eastZone);
+        wallFaceY(y0, x0, x1, bottom, top, material, fog, northZone);
+        wallFaceY(y1, x0, x1, bottom, top, material, fog, southZone);
 
         const ceilingBound =
           i + 1 < sections.length ? sections[i + 1].bottom : cell.ceilingHeight;
         if (top < ceilingBound) {
-          capQuad(x0, y0, x1, y1, top, material, fog);
+          // The cap faces upward, into this cell's own open band directly
+          // above the section (a sill's visible top) -- query just above
+          // `top`, into that band.
+          const zoneId = resolvedZones.zoneAtCell(cx, cy, top + ZONE_EPSILON * 4);
+          capQuad(x0, y0, x1, y1, top, material, fog, zoneId);
         }
         const floorBound = i > 0 ? sections[i - 1].top : cell.floorHeight;
         if (bottom > floorBound) {
-          capQuad(x0, y0, x1, y1, bottom, material, fog);
+          // The cap faces downward, into this cell's own open band
+          // directly below the section (a lintel's visible underside).
+          const zoneId = resolvedZones.zoneAtCell(cx, cy, bottom - ZONE_EPSILON * 4);
+          capQuad(x0, y0, x1, y1, bottom, material, fog, zoneId);
         }
       }
     }
