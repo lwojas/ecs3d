@@ -135,7 +135,7 @@ export class TriggerSystem extends System {
 
   handleExit(trigger, triggerEntity, activator) {
     for (const action of trigger.onExit) {
-      if (!action?.event) continue;
+      if (!action?.event) return;
 
       this.eventBus.emit(action.event, {
         trigger: triggerEntity,
@@ -152,7 +152,7 @@ export class TriggerSystem extends System {
     if (trigger.once) trigger.enabled = false;
 
     for (const action of trigger.onEnter) {
-      if (!action?.event) continue;
+      if (!action?.event) return;
 
       this.eventBus.emit(action.event, {
         trigger: triggerEntity,

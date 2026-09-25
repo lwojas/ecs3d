@@ -32,6 +32,7 @@ export class EventRouter {
     this.eventBus.on("resource.add", (data) => this.consumePickup(data));
     this.eventBus.on("portal.activate", (data) => this.beginTeleport(data));
     this.eventBus.on("cell.mutate", (data) => this.mutateCell(data));
+    this.eventBus.on("cell.restore", (data) => this.restoreCell(data));
   }
 
   registerCellSystem(system) {
@@ -75,6 +76,10 @@ export class EventRouter {
 
   mutateCell(data) {
     this.cellSystem.mutateCell(data);
+  }
+
+  restoreCell(data) {
+    this.cellSystem.restoreCell(data);
   }
 
   consumePickup(data) {

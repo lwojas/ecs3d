@@ -63,7 +63,7 @@ export class AudioAPI {
       definition.volume * this.masterVolume,
       definition.loop,
     );
-    console.log(sound);
+    // console.log(sound);
 
     /*
      * The pool itself handles simultaneous playback,

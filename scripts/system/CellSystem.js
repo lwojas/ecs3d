@@ -22,6 +22,10 @@ export class CellSystem extends System {
     this.removeSection(data.trigger);
   }
 
+  restoreCell(data) {
+    this.restoreOriginalSection(data.trigger);
+  }
+
   removeSection(entity) {
     const cellComponent = entity.getComponent("CellComponent");
     if (!cellComponent) return;
@@ -31,11 +35,8 @@ export class CellSystem extends System {
     cellComponent.originalSections.forEach((section, idx) => {
       if (idx !== index) newSections.push(section);
     });
-    console.log(newSections);
-    this.raycaster.setCellSections(cellComponent.cellId, newSections);
-    // const blocking = !cellComponent.originalBlocking;
 
-    // console.log(blocking);
+    this.raycaster.setCellSections(cellComponent.cellId, newSections);
 
     if (cellComponent.mutateBlocking) {
       this.raycaster.setCellBlocking(
@@ -43,13 +44,9 @@ export class CellSystem extends System {
         !cellComponent.originalBlocking,
       );
     }
-    timerDelay(cellComponent.timeout, () =>
-      this.restoreOriginalSection(entity),
-    );
   }
 
   restoreOriginalSection(entity) {
-    console.log(entity);
     const cellComponent = entity.getComponent("CellComponent");
     if (!cellComponent) return;
     this.raycaster.setCellSections(

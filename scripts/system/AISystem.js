@@ -582,6 +582,7 @@ export class AISystem extends System {
     movement.moveX = strafeX * wobble;
     movement.moveY = strafeY * wobble;
     movement.speed = combatMovement.strafeSpeed;
+    this.animationSystem.play(movement.entity, "walk");
   }
 
   // Rotation simulated here, entirely separate from the raycaster's camera
@@ -642,7 +643,7 @@ export class AISystem extends System {
 
     switch (ai.state) {
       case "attack":
-        this.animationSystem.play(ai.entity, "attack");
+        this.animationSystem.play(ai.entity, "walk");
         break;
       case "idle":
         this.animationSystem.play(ai.entity, "idle");
