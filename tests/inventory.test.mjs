@@ -184,9 +184,10 @@ async function testComponentDefaultsAreTheFinalFallback() {
 
   const entity = session.playerEntities.get("player-1");
   const inventory = entity.getComponent("InventoryComponent");
-  // componentDefaults.player.InventoryComponent, untouched.
-  assert.deepEqual(inventory.items, ["pistol"]);
-  assert.equal(inventory.equipped, "pistol");
+  // componentDefaults.player.InventoryComponent is `{}` -- InventoryComponent's
+  // own constructor defaults then apply: no items, nothing equipped.
+  assert.deepEqual(inventory.items, []);
+  assert.equal(inventory.equipped, null);
 }
 
 const tests = [
