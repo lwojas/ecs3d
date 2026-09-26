@@ -24,17 +24,27 @@ function resolveScale(scale) {
     };
   }
 
-  if (typeof scale === "number") {
+  if (typeof scale === "number" || "min" in scale) {
+    const uniform = resolveValue(scale, 1);
+
     return {
-      x: scale,
-      y: scale,
+      x: uniform,
+      y: uniform,
     };
   }
 
   return {
-    x: scale.x ?? 1,
-    y: scale.y ?? 1,
+    x: resolveValue(scale.x, 1),
+    y: resolveValue(scale.y, 1),
   };
+}
+
+function resolveTexture(texture) {
+  if (Array.isArray(texture)) {
+    return texture[Math.floor(Math.random() * texture.length)];
+  }
+
+  return texture;
 }
 
 export class ParticleSystem {
@@ -107,15 +117,15 @@ export class ParticleSystem {
 
       velocityZ: resolveValue(overrides.velocityZ ?? velocity.z),
 
-      gravity: overrides.gravity ?? particleConfig.gravity ?? 1,
+      gravity: resolveValue(overrides.gravity ?? particleConfig.gravity, 1),
 
       life: lifetime,
 
-      texture: overrides.texture ?? particleConfig.texture,
+      texture: resolveTexture(overrides.texture ?? particleConfig.texture),
 
-      width: overrides.width ?? particleConfig.width ?? 1,
+      width: resolveValue(overrides.width ?? particleConfig.width, 1),
 
-      height: overrides.height ?? particleConfig.height ?? 1,
+      height: resolveValue(overrides.height ?? particleConfig.height, 1),
 
       scaleX: scale.x,
       scaleY: scale.y,

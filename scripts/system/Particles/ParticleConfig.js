@@ -29,10 +29,13 @@ export const PARTICLE_CONFIG = {
   },
 
   deathGib: {
-    texture: "gib",
+    texture: ["gib", "bloodDrop"],
     width: 0.28,
     height: 0.28,
-    scale: 4,
+    scale: {
+      min: 2,
+      max: 5,
+    },
 
     lifetime: {
       min: 0.3,
