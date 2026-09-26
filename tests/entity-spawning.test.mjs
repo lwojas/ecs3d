@@ -133,6 +133,64 @@ function testRespawnResetsPositionHealthAndReenables() {
   assert.equal(movement.enabled, true);
 }
 
+function testReleaseMakesAnEntityReusableByTheNextAnonymousSpawn() {
+  const spawner = makeSpawner();
+  const first = spawner.spawn({ type: "npc", spawnPoint: "zoneA" });
+
+  spawner.release(first);
+  assert.equal(first.getComponent("HealthComponent").enabled, false);
+
+  const second = spawner.spawn({ type: "npc", spawnPoint: "zoneB" });
+  assert.equal(second, first, "should reuse the released entity instead of constructing a new one");
+  assert.equal(second.getComponent("HealthComponent").enabled, true);
+}
+
+function testRecycledEntityDoesNotLeakPreviousModifiersOrState() {
+  const spawner = makeSpawner();
+  const first = spawner.spawn({
+    type: "npc",
+    spawnPoint: "zoneA",
+    modifiers: { healthMultiplier: 3 },
+  });
+  assert.equal(first.getComponent("HealthComponent").maximum, 300);
+
+  // Simulate accumulated runtime state a live NPC would have picked up.
+  first.getComponent("HealthComponent").current = 1;
+  first.getComponent("MovementComponent").x = 999;
+
+  spawner.release(first);
+  const second = spawner.spawn({ type: "npc", spawnPoint: "zoneB" }); // no modifiers this time
+
+  assert.equal(second, first);
+  assert.equal(second.getComponent("HealthComponent").maximum, 100, "previous spawn's modifier must not leak");
+  assert.equal(second.getComponent("HealthComponent").current, 100);
+  assert.equal(second.getComponent("MovementComponent").x, 32); // 8 * cellSize(4), zoneB
+}
+
+function testRecyclePreservesEntityIdentity() {
+  const spawner = makeSpawner();
+  const entity = spawner.spawn({ type: "npc", uniqueId: "identity_test", spawnPoint: "zoneA" });
+  const id = entity.id;
+  const tempId = entity.tempId;
+  const prefabId = entity.prefabId;
+
+  spawner.release(entity);
+  spawner.spawn({ type: "npc", spawnPoint: "zoneB" }); // uniqueId requests never draw from the pool
+
+  assert.equal(entity.id, id);
+  assert.equal(entity.tempId, tempId);
+  assert.equal(entity.prefabId, prefabId);
+}
+
+function testUniqueIdSpawnNeverReusesAPooledEntity() {
+  const spawner = makeSpawner();
+  const released = spawner.spawn({ type: "npc", spawnPoint: "zoneA" });
+  spawner.release(released);
+
+  const named = spawner.spawn({ type: "npc", uniqueId: "must_be_fresh", spawnPoint: "zoneB" });
+  assert.notEqual(named, released, "a uniqueId request must not silently take over a pooled entity's id");
+}
+
 function testDuplicateUniqueIdWarnsAndCreatesASecondEntity() {
   // Regression: authoring the same uniqueId twice (e.g. a copy-pasted
   // entity entry) used to fail silently -- the second entity would win
@@ -161,6 +219,10 @@ const tests = [
   ["EntitySpawner modifiers scale HealthComponent.maximum only", testHealthMultiplierScalesMaximumOnly],
   ["EntitySpawner.spawnAuthored accepts authored entity data directly", testSpawnAuthoredAcceptsEntityDataShapeDirectly],
   ["EntitySpawner.respawn resets position/health and re-enables", testRespawnResetsPositionHealthAndReenables],
+  ["EntitySpawner.release makes an entity reusable by the next anonymous spawn", testReleaseMakesAnEntityReusableByTheNextAnonymousSpawn],
+  ["Recycled entity does not leak previous spawn's modifiers or runtime state", testRecycledEntityDoesNotLeakPreviousModifiersOrState],
+  ["Recycling preserves entity identity (id/tempId/prefabId)", testRecyclePreservesEntityIdentity],
+  ["A uniqueId spawn request never reuses a pooled entity", testUniqueIdSpawnNeverReusesAPooledEntity],
   ["PrefabFactory.createEntity warns on a duplicate uniqueId", testDuplicateUniqueIdWarnsAndCreatesASecondEntity],
 ];
 

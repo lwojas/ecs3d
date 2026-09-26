@@ -37,6 +37,12 @@ export class EntitySpawner {
     this.raycaster = raycaster;
     this.mapData = mapData;
     this.zoneIndex = {};
+
+    // Disabled entities available for spawn() to reuse instead of
+    // constructing a new one, keyed by prefabId. Scoped to this spawner
+    // (one map/world, same as SpawnGroup) -- nothing needs to clear it
+    // explicitly, since a new EntitySpawner is created per map anyway.
+    this.recyclable = new Map();
   }
 
   // request: { prefab | type, uniqueId, spawnPoint, spawnZone, components, modifiers }
@@ -86,11 +92,44 @@ export class EntitySpawner {
     // console.log(this.prefabFactory.getDefaultComponents(resolvedType));
     const finalComponents = applyModifiers(base, modifiers);
 
+    // Only anonymous requests draw from the pool -- reusing a pooled
+    // entity for a caller-chosen uniqueId would mean reassigning its id
+    // (and EntityManager.byId entry), which nothing today needs and this
+    // spawner doesn't attempt.
+    const recycled = uniqueId ? null : this.acquireRecyclable(resolvedType);
+    if (recycled) {
+      this.prefabFactory.resetEntity(recycled, finalComponents);
+      recycled.enable();
+      return recycled;
+    }
+
     return this.prefabFactory.createEntity({
       type: resolvedType,
       uniqueId,
       components: finalComponents,
     });
+  }
+
+  // Returns a disabled entity previously release()d for `prefabId`, or
+  // null if none is available -- callers then fall back to constructing
+  // a new one. Popped immediately so nothing else can claim it too.
+  acquireRecyclable(prefabId) {
+    const bucket = this.recyclable.get(prefabId);
+    if (!bucket || bucket.length === 0) return null;
+    return bucket.pop();
+  }
+
+  // Marks `entity` disabled and available for a future spawn() of the
+  // same prefabId to reuse instead of constructing a new entity. Not
+  // wave-specific -- any caller that decides an entity is done (a
+  // SpawnGroup on death, an alarm, a scripted encounter) can call this
+  // directly.
+  release(entity) {
+    entity.disable();
+    if (!this.recyclable.has(entity.prefabId)) {
+      this.recyclable.set(entity.prefabId, []);
+    }
+    this.recyclable.get(entity.prefabId).push(entity);
   }
 
   spawnAuthored(entityDataList) {

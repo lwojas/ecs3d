@@ -1,4 +1,5 @@
 import { GameRules } from "./GameRules.js";
+import { SpawnGroup } from "../../services/SpawnGroup.js";
 
 // Sequential wave defence: waves spawn one at a time, advancing only once
 // the current wave's enemies are all dead. A player death clears whatever
@@ -25,9 +26,8 @@ export class WaveRules extends GameRules {
     this.waves = waves;
     this.defaultSpawnZone = defaultSpawnZone;
     this.startingLives = lives;
-    this.spawner = null;
+    this.enemies = null;
     this.mapData = null;
-    this.activeEnemies = [];
     this.waveIndex = 0;
   }
 
@@ -48,16 +48,19 @@ export class WaveRules extends GameRules {
   // Rules persist across maps; the spawner doesn't -- MapWorld hands us
   // the current one after each build and takes it back before tearing
   // the world down, so we never hold a reference to a destroyed map's
-  // spawner. mapData is kept for the same reason resolveSpawnZone() needs
-  // it: to reason about the *current* map's named zones, never a stale
-  // one from a map this rules instance already left.
+  // spawner. A fresh SpawnGroup is made here each time rather than
+  // reused, so it's never possible to hold one built from a previous,
+  // already-destroyed map's spawner either. mapData is kept for the
+  // same reason resolveSpawnZone() needs it: to reason about the
+  // *current* map's named zones, never a stale one from a map this
+  // rules instance already left.
   attachWorld({ spawner, mapData }) {
-    this.spawner = spawner;
+    this.enemies = new SpawnGroup({ spawner });
     this.mapData = mapData;
   }
 
   detachWorld() {
-    this.spawner = null;
+    this.enemies = null;
     this.mapData = null;
   }
 
@@ -68,7 +71,6 @@ export class WaveRules extends GameRules {
   // same session gets its waves too.
   onMapLoaded(gameplay, map) {
     this.waveIndex = 0;
-    this.activeEnemies = [];
     this.startWave(gameplay, 0);
   }
 
@@ -114,9 +116,7 @@ export class WaveRules extends GameRules {
   }
 
   onEnemyKilled(gameplay, enemy, killer) {
-    this.activeEnemies = this.activeEnemies.filter(
-      (active) => active !== enemy,
-    );
+    this.enemies.release(enemy);
 
     const player = killer && gameplay.getPlayer(killer.id);
     if (player) {
@@ -130,7 +130,7 @@ export class WaveRules extends GameRules {
       gameplay.hud?.notify(`${player.id} killed ${enemy.id}`);
     }
 
-    if (this.activeEnemies.length === 0) {
+    if (this.enemies.entities.length === 0) {
       this.advanceWave(gameplay);
     }
   }
@@ -153,8 +153,7 @@ export class WaveRules extends GameRules {
   }
 
   clearActiveEnemies() {
-    this.activeEnemies.forEach((enemy) => enemy.disable());
-    this.activeEnemies = [];
+    this.enemies?.clear();
   }
 
   endGame(gameplay, result) {
@@ -172,20 +171,15 @@ export class WaveRules extends GameRules {
       console.log("No enemy start found, aborting wave spawn");
       return;
     }
-    if (!this.spawner) return;
+    if (!this.enemies) return;
 
-    const count = wave.count ?? 1;
-    const spawnZone = this.resolveSpawnZone(wave);
-    for (let i = 0; i < count; i++) {
-      this.activeEnemies.push(
-        this.spawner.spawn({
-          prefab: wave.prefab,
-          spawnZone,
-          spawnPoint: wave.spawnPoint,
-          modifiers: wave.modifiers,
-        }),
-      );
-    }
+    this.enemies.spawn({
+      prefab: wave.prefab,
+      count: wave.count ?? 1,
+      spawnZone: this.resolveSpawnZone(wave),
+      spawnPoint: wave.spawnPoint,
+      modifiers: wave.modifiers,
+    });
   }
 
   // Where a wave spawns is a runtime gameplay decision, made here, not by

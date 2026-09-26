@@ -16,10 +16,11 @@ export class PrefabFactory {
     return this.componentDefaults[type] || {};
   }
 
-  createEntity(entityData) {
-    const { type, components, uniqueId } = entityData;
-
-    // Fetch default components for this type, fallback to empty object
+  // Fetch default components for `type`, overlay `components`, then any
+  // previously-saved snapshot for `uniqueId` (allowing overrides) -- the
+  // one merge rule shared by both constructing a new entity and
+  // resetting an existing one back to a prefab's canonical state.
+  buildComponents(type, components, uniqueId) {
     const defaultComponents = this.componentDefaults[type] || {};
 
     // Check for previous component snapshots
@@ -32,17 +33,19 @@ export class PrefabFactory {
       });
     });
 
-    // Merge default components with provided components (allowing overrides)
-    const mergedComponents = {
+    return {
       ...defaultComponents,
       ...components,
       ...inventoryComponents,
     };
+  }
 
-    // Create new entity
-    const entity = new Entity(uniqueId);
-    entity.snapshot = mergedComponents;
-    // Add merged components to the entity
+  // (Re)constructs every component named in `mergedComponents` fresh, via
+  // its own constructor -- the only reset a component ever needs, since
+  // each one derives all of its runtime state from (entity, data) alone.
+  // addComponent() replaces whatever component of that name the entity
+  // already had, so this is a complete reset, not just an overlay.
+  applyComponents(entity, mergedComponents) {
     for (const [componentName, componentData] of Object.entries(
       mergedComponents,
     )) {
@@ -54,6 +57,17 @@ export class PrefabFactory {
         );
       }
     }
+  }
+
+  createEntity(entityData) {
+    const { type, components, uniqueId } = entityData;
+    const mergedComponents = this.buildComponents(type, components, uniqueId);
+
+    // Create new entity
+    const entity = new Entity(uniqueId);
+    entity.snapshot = mergedComponents;
+    entity.prefabId = type;
+    this.applyComponents(entity, mergedComponents);
 
     // A duplicated uniqueId in authored data silently produces two
     // separate Entity objects (EntityManager has no dedup) -- the second
@@ -69,6 +83,24 @@ export class PrefabFactory {
     }
 
     this.entityManager.addEntity(entity);
+    return entity;
+  }
+
+  // Rebuilds every component of an existing entity from scratch -- same
+  // construction path createEntity() uses for a brand new one, replayed
+  // against a live Entity object instead. `entity.prefabId` supplies the
+  // canonical defaults, so a recycled entity returns to that prefab's
+  // stock state before `components` (this spawn's own configuration) is
+  // layered on. Identity (id/tempId) and entity-manager registration are
+  // untouched -- only component state is replaced.
+  resetEntity(entity, components) {
+    const mergedComponents = this.buildComponents(
+      entity.prefabId,
+      components,
+      entity.id,
+    );
+    entity.snapshot = mergedComponents;
+    this.applyComponents(entity, mergedComponents);
     return entity;
   }
 }

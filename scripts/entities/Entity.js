@@ -14,6 +14,7 @@ export class Entity {
   }
 
   disable() {
+    this.isEnabled = false;
     for (let componentName in this.components) {
       const component = this.components[componentName];
       // console.log(component);
@@ -23,9 +24,16 @@ export class Entity {
     }
   }
 
-  // Symmetric to disable() -- used by EntitySpawner.respawn() to bring a
-  // dead entity's components back to life without reconstructing it.
+  // Symmetric to disable() -- used by EntitySpawner.respawn()/recycle() to
+  // bring a dead entity's components back to life without reconstructing
+  // it. isEnabled is otherwise inert for system membership (see
+  // EntityManager.updateEntityLists -- it only ever adds, never removes,
+  // an entity from a system's list, so every system instead gates its own
+  // per-frame work on each component's `.enabled`); it exists so
+  // AISystem's sticky-target checks (getStickyTarget/getStickyHuntTarget)
+  // can tell a disabled/recycled entity apart from a live one.
   enable() {
+    this.isEnabled = true;
     for (let componentName in this.components) {
       const component = this.components[componentName];
       if (!component.enabled) {
