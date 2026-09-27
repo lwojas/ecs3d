@@ -15,13 +15,16 @@ export class TriggerComponent {
     // Authored/serializable configuration.
     this.enabled = data.enabled ?? true;
     this.once = data.once ?? false;
-    // [{ event: "lights.set", data: { ... } }, ...]. A list so one
-    // trigger can fire several actions on entry. Deliberately generic --
-    // TriggerSystem only ever reads `.event`/`.data` off each entry,
-    // never interprets it. onExit/onStay aren't added as fields yet
-    // (nothing needs them); TriggerSystem's enter/exit diffing already
-    // computes exits as a side effect, so adding them later is one more
-    // field here + one more branch there, not a redesign.
+    // [{ event: "lights.set" }, ...]. A list so one trigger can fire
+    // several actions on entry. Deliberately generic -- TriggerSystem
+    // only ever reads `.event` off each entry and emits it with the
+    // complete trigger/activator entities, never any per-action payload;
+    // whatever system listens for that event takes ownership from there
+    // and decides what to do with those entities. onExit/onStay aren't
+    // added as fields yet (nothing needs them); TriggerSystem's
+    // enter/exit diffing already computes exits as a side effect, so
+    // adding them later is one more field here + one more branch there,
+    // not a redesign.
     this.onEnter = data.onEnter ?? [];
     this.onExit = data.onExit ?? [];
     this.ignoredTypes = data.ignoredTypes || ["enemy"];

@@ -24,7 +24,11 @@ function makeWorld() {
   new EventBus("game"); // registers "game"/"EventSystem" -- TriggerSystem resolves it
   const entityManager = new EntityManager();
   const prefabFactory = new PrefabFactory(entityManager, {
-    activator: { MovementComponent: {}, CollisionComponent: {} },
+    activator: {
+      MovementComponent: {},
+      CollisionComponent: { layer: "PLAYER", mask: ["NPC", "PROJECTILE", "TRIGGER"] },
+      ActorComponent: {},
+    },
     trigger: {},
     light: {},
   });
@@ -212,14 +216,11 @@ function testOnceTrueBlocksASecondActivatorToo() {
 function testOnEnterFiresEveryConfiguredAction() {
   const { prefabFactory } = makeWorld();
 
-  makeTrigger(prefabFactory, "trigger_1", {
+  const trigger = makeTrigger(prefabFactory, "trigger_1", {
     once: false,
-    onEnter: [
-      { event: "test.enter.a", data: { n: 1 } },
-      { event: "test.enter.b", data: { n: 2 } },
-    ],
+    onEnter: [{ event: "test.enter.a" }, { event: "test.enter.b" }],
   });
-  makeActivator(prefabFactory, "activator_1");
+  const activator = makeActivator(prefabFactory, "activator_1");
 
   const { collisionSystem, triggerSystem } = makeCollisionAndTriggerSystems();
   const firedA = [];
@@ -230,8 +231,11 @@ function testOnEnterFiresEveryConfiguredAction() {
   collisionSystem.update();
   triggerSystem.update();
 
-  assert.deepEqual(firedA, [{ n: 1 }]);
-  assert.deepEqual(firedB, [{ n: 2 }]);
+  // TriggerSystem never carries a per-action payload -- it hands the
+  // complete trigger/activator entities to whatever listens, for that
+  // listener to act on.
+  assert.deepEqual(firedA, [{ trigger, activator }]);
+  assert.deepEqual(firedB, [{ trigger, activator }]);
 }
 
 // --- End-to-end: CollisionSystem -> TriggerSystem -> EventBus -> EventRouter -> LightSystem
@@ -241,12 +245,7 @@ function testEndToEndTriggerTogglesLightsThroughTheWholeStack() {
 
   makeTrigger(prefabFactory, "trigger_lights_demo", {
     once: true,
-    onEnter: [
-      {
-        event: "lights.set",
-        data: { on: ["light_2", "light_3"], off: ["light_1"] },
-      },
-    ],
+    onEnter: [{ event: "lights.set" }],
   });
   makeActivator(prefabFactory, "player-1");
 
@@ -269,7 +268,17 @@ function testEndToEndTriggerTogglesLightsThroughTheWholeStack() {
   const { collisionSystem, triggerSystem } = makeCollisionAndTriggerSystems();
   const lightSystem = new LightSystem({ lights: [] });
   const eventRouter = new EventRouter(triggerSystem.eventBus);
-  eventRouter.registerLightingSystem(lightSystem);
+
+  // EventRouter hands "lights.set" listeners the raw { trigger, activator }
+  // pair; it's up to the registered listener to decide what that specific
+  // trigger means. This level's own wiring: "trigger_lights_demo" turns on
+  // light_2/light_3 and turns off light_1.
+  eventRouter.registerLightingSystem({
+    setLights({ trigger }) {
+      if (trigger.id !== "trigger_lights_demo") return;
+      lightSystem.setLights({ on: ["light_2", "light_3"], off: ["light_1"] });
+    },
+  });
 
   collisionSystem.update();
   triggerSystem.update();
